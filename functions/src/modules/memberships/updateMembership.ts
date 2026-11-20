@@ -39,9 +39,27 @@ export async function updateMembershipHandler(request: CallableRequest): Promise
     }
 
     // Protection for OWNER accounts:
-    // Only an OWNER can modify or suspend another membership; non-owners cannot touch OWNER accounts
-    if (targetMembership.role === 'OWNER') {
-      throw new ForbiddenError('Cannot modify the organization owner membership');
+    // Only an OWNER can modify another OWNER account
+    if (targetMembership.role === 'OWNER' && membership.role !== 'OWNER') {
+      throw new ForbiddenError('Only an organization OWNER can modify an OWNER membership');
+    }
+
+    // Protection for the Last Active OWNER:
+    // If target is currently an active OWNER, and is being demoted or suspended, ensure at least one other active owner remains
+    const isDemotingOwner = targetMembership.role === 'OWNER' && !!input.role;
+    const isSuspendingOwner = targetMembership.role === 'OWNER' && input.status === 'SUSPENDED';
+
+    if (isDemotingOwner || isSuspendingOwner) {
+      const activeOwnersSnap = await db
+        .collection('userMemberships')
+        .where('organizationId', '==', input.organizationId)
+        .where('role', '==', 'OWNER')
+        .where('status', '==', 'ACTIVE')
+        .get();
+
+      if (activeOwnersSnap.size <= 1) {
+        throw new ForbiddenError('Cannot demote or suspend the last active OWNER of the organization');
+      }
     }
 
     const now = admin.firestore.Timestamp.now();

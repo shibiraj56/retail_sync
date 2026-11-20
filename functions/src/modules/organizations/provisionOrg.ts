@@ -16,6 +16,7 @@ export async function provisionOrganizationHandler(request: CallableRequest): Pr
   organizationId: string;
   storeId: string;
   membershipId: string;
+  claimsSynced: boolean;
 }> {
   try {
     const user = requireAuth(request);
@@ -23,20 +24,10 @@ export async function provisionOrganizationHandler(request: CallableRequest): Pr
     // Validate request payload
     const input = ProvisionOrganizationSchema.parse(request.data);
 
-    // Duplicate Provisioning Prevention:
-    // Check if user already owns an active organization with the same legal name
-    const existingOrgSnap = await db
-      .collection('organizations')
-      .where('ownerUserId', '==', user.uid)
-      .where('legalName', '==', input.legalName)
-      .limit(1)
-      .get();
-
-    if (!existingOrgSnap.empty) {
-      throw new ConflictError(
-        `You have already provisioned an organization with the legal name '${input.legalName}'`
-      );
-    }
+    // Compute deterministic reservation key to prevent duplicate provisioning under concurrent requests
+    const normalizedName = input.legalName.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const reservationId = `${user.uid}_${normalizedName}`;
+    const reservationRef = db.collection('organizationReservations').doc(reservationId);
 
     const orgRef = db.collection('organizations').doc();
     const orgId = orgRef.id;
@@ -121,31 +112,56 @@ export async function provisionOrganizationHandler(request: CallableRequest): Pr
       updatedAt: now,
     };
 
-    // Atomic execution of organization creation
-    const batch = db.batch();
-    batch.set(orgRef, orgDoc);
-    batch.set(storeRef, storeDoc);
-    batch.set(membershipRef, membershipDoc);
-    batch.set(
-      userRef,
-      {
-        defaultOrganizationId: orgId,
-        updatedAt: now,
-      },
-      { merge: true }
-    );
+    // Execute atomic transaction for reservation, organization, store, and membership creation
+    await db.runTransaction(async (transaction) => {
+      const reservationSnap = await transaction.get(reservationRef);
+      if (reservationSnap.exists) {
+        throw new ConflictError(
+          `You have already provisioned an organization with the legal name '${input.legalName}'`
+        );
+      }
 
-    await batch.commit();
+      // 1. Write unique reservation
+      transaction.set(reservationRef, {
+        userId: user.uid,
+        legalName: input.legalName,
+        organizationId: orgId,
+        createdAt: now,
+      });
 
-    // Set supplementary custom claims on user Auth token
+      // 2. Write organization document
+      transaction.set(orgRef, orgDoc);
+
+      // 3. Write primary store document
+      transaction.set(storeRef, storeDoc);
+
+      // 4. Write authoritative owner membership
+      transaction.set(membershipRef, membershipDoc);
+
+      // 5. Update user profile with default organization pointer
+      transaction.set(
+        userRef,
+        {
+          defaultOrganizationId: orgId,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+    });
+
+    // Handle Firebase Auth custom claims outside Firestore transaction
+    // (Auth claims and Firestore writes are not an atomic unit across services).
+    // The backend uses authoritative Firestore membership anyway, so partial claim failure does not compromise security.
+    let claimsSynced = false;
     try {
       await auth.setCustomUserClaims(user.uid, {
         orgId,
         defaultStoreId: storeId,
         role: 'OWNER',
       });
+      claimsSynced = true;
     } catch (claimErr) {
-      console.warn('Failed to set supplementary custom claims (non-critical):', claimErr);
+      console.warn('Failed to set supplementary custom claims (authoritative membership is intact):', claimErr);
     }
 
     // Audit log entry
@@ -165,6 +181,7 @@ export async function provisionOrganizationHandler(request: CallableRequest): Pr
         legalName: input.legalName,
         businessType: input.businessType,
         primaryStoreId: storeId,
+        claimsSynced,
       },
     });
 
@@ -172,6 +189,7 @@ export async function provisionOrganizationHandler(request: CallableRequest): Pr
       organizationId: orgId,
       storeId,
       membershipId,
+      claimsSynced,
     };
   } catch (error) {
     return handleFunctionError(error);

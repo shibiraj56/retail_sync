@@ -4,7 +4,7 @@ import { db, auth } from '../../config/firebase';
 import { requirePermission } from '../../middleware/auth';
 import { logAuditEvent } from '../../middleware/audit';
 import { InviteMemberSchema } from '../../shared/schemas';
-import { ConflictError, handleFunctionError } from '../../shared/errors';
+import { ConflictError, ForbiddenError, handleFunctionError } from '../../shared/errors';
 import type { UserMembershipDocument } from '../../shared/types';
 import { ROLE_DEFAULT_PERMISSIONS } from '../../shared/types';
 
@@ -29,7 +29,7 @@ export async function inviteMemberHandler(request: CallableRequest): Promise<{
     try {
       const userRecord = await auth.getUserByEmail(input.email);
       targetUid = userRecord.uid;
-    } catch (err: unknown) {
+    } catch {
       // User does not exist in Firebase Auth yet; create an invited placeholder user
       const placeholderUser = await auth.createUser({
         email: input.email,
@@ -37,6 +37,11 @@ export async function inviteMemberHandler(request: CallableRequest): Promise<{
         disabled: false,
       });
       targetUid = placeholderUser.uid;
+    }
+
+    // Security check: users cannot invite themselves
+    if (targetUid === user.uid) {
+      throw new ForbiddenError('Users cannot invite themselves to an organization');
     }
 
     const membershipId = `${targetUid}_${input.organizationId}`;

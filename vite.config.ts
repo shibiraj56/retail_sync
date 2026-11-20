@@ -17,5 +17,23 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-firebase': [
+            'firebase/app',
+            'firebase/auth',
+            'firebase/firestore',
+            'firebase/functions',
+          ],
+          'vendor-ui': ['lucide-react', 'clsx', 'tailwind-merge'],
+          'vendor-form': ['react-hook-form', '@hookform/resolvers', 'zod'],
+          'vendor-query': ['@tanstack/react-query'],
+          'vendor-i18n': ['i18next', 'react-i18next'],
+        },
+      },
+    },
   },
 });

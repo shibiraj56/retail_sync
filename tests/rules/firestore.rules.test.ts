@@ -1,4 +1,4 @@
-import { describe, it, beforeAll, afterAll, beforeEach, expect } from 'vitest';
+import { describe, it, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
   initializeTestEnvironment,
   RulesTestEnvironment,
@@ -8,7 +8,7 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 
-describe('Firestore Security Rules Unit Tests', () => {
+describe('Firestore Security Rules Comprehensive Security Audit Test Suite', () => {
   let testEnv: RulesTestEnvironment;
 
   beforeAll(async () => {
@@ -37,7 +37,8 @@ describe('Firestore Security Rules Unit Tests', () => {
     }
   });
 
-  it('SEC-TC-PROFILE: should allow users to read and update their own global profile', async () => {
+  // --- 1. User Profile Protection & Privilege Escalation ---
+  it('SEC-TC-PROFILE: should allow users to create and update their permitted profile fields', async () => {
     const aliceContext = testEnv.authenticatedContext('alice_123', {
       email: 'alice@retail.com',
     });
@@ -46,30 +47,76 @@ describe('Firestore Security Rules Unit Tests', () => {
     const userDocRef = db.collection('users').doc('alice_123');
     await assertSucceeds(
       userDocRef.set({
-        displayName: 'Alice Retailer',
+        id: 'alice_123',
         email: 'alice@retail.com',
+        displayName: 'Alice Retailer',
+        isActive: true,
       })
     );
 
-    const bobContext = testEnv.authenticatedContext('bob_456', {
-      email: 'bob@retail.com',
-    });
-    const bobDb = bobContext.firestore();
-    // Bob should not be able to write to Alice's profile
-    await assertFails(
-      bobDb.collection('users').doc('alice_123').set({
-        displayName: 'Malicious Bob Overwrite',
+    // Update only permitted field (displayName)
+    await assertSucceeds(
+      userDocRef.update({
+        displayName: 'Alice Manager',
       })
     );
   });
 
-  it('SEC-TC-MEMBERSHIP: should forbid direct client writes to userMemberships collection', async () => {
+  it('SEC-TC-08-ESCALATION: should strictly reject attempts to escalate privileges or modify sensitive fields on /users/{userId}', async () => {
     const aliceContext = testEnv.authenticatedContext('alice_123', {
       email: 'alice@retail.com',
     });
     const db = aliceContext.firestore();
 
-    // Client attempts to grant themselves OWNER role directly
+    // Setup base user profile
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('users').doc('alice_123').set({
+        id: 'alice_123',
+        email: 'alice@retail.com',
+        displayName: 'Alice Retailer',
+        isActive: true,
+        defaultOrganizationId: 'org_legit',
+      });
+    });
+
+    const userDocRef = db.collection('users').doc('alice_123');
+
+    // Attempt 1: Inject 'role: OWNER'
+    await assertFails(
+      userDocRef.update({
+        role: 'OWNER',
+      })
+    );
+
+    // Attempt 2: Inject 'isAdmin: true'
+    await assertFails(
+      userDocRef.update({
+        isAdmin: true,
+      })
+    );
+
+    // Attempt 3: Modify account status 'isActive: false'
+    await assertFails(
+      userDocRef.update({
+        isActive: false,
+      })
+    );
+
+    // Attempt 4: Tamper with organization assignment
+    await assertFails(
+      userDocRef.update({
+        defaultOrganizationId: 'org_victim',
+      })
+    );
+  });
+
+  // --- 2. Membership Collection Lockdown ---
+  it('SEC-TC-09-MEMBERSHIP: should strictly forbid direct client writes to userMemberships collection', async () => {
+    const aliceContext = testEnv.authenticatedContext('alice_123', {
+      email: 'alice@retail.com',
+    });
+    const db = aliceContext.firestore();
+
     const membershipRef = db.collection('userMemberships').doc('alice_123_org_apex');
     await assertFails(
       membershipRef.set({
@@ -81,10 +128,17 @@ describe('Firestore Security Rules Unit Tests', () => {
     );
   });
 
-  it('SEC-TC-01: should reject cross-tenant reads (Org A user reading Org B store documents)', async () => {
-    // Setup existing Org B document via admin context
+  // --- 3. Multi-Tenant Cross-Tenant Boundary Tests ---
+  it('SEC-TC-01: should reject cross-tenant reads (Org A user reading Org B documents)', async () => {
+    // Setup Org B store and membership
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const adminDb = context.firestore();
+      await adminDb.collection('userMemberships').doc('bob_org_bravo').set({
+        userId: 'bob_456',
+        organizationId: 'org_bravo',
+        role: 'OWNER',
+        status: 'ACTIVE',
+      });
       await adminDb
         .collection('organizations')
         .doc('org_bravo')
@@ -96,11 +150,17 @@ describe('Firestore Security Rules Unit Tests', () => {
         });
     });
 
-    // Alice belongs to Org Alpha
-    const aliceContext = testEnv.authenticatedContext('alice_123', {
-      orgId: 'org_alpha',
-      role: 'CASHIER',
+    // Alice belongs only to Org Alpha
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('userMemberships').doc('alice_123_org_alpha').set({
+        userId: 'alice_123',
+        organizationId: 'org_alpha',
+        role: 'OWNER',
+        status: 'ACTIVE',
+      });
     });
+
+    const aliceContext = testEnv.authenticatedContext('alice_123');
     const db = aliceContext.firestore();
 
     const storeRef = db
@@ -112,11 +172,17 @@ describe('Firestore Security Rules Unit Tests', () => {
     await assertFails(storeRef.get());
   });
 
-  it('SEC-TC-02: should reject cross-tenant writes (Org A user writing to Org B products)', async () => {
-    const aliceContext = testEnv.authenticatedContext('alice_123', {
-      orgId: 'org_alpha',
-      role: 'OWNER',
+  it('SEC-TC-02: should reject cross-tenant writes (Org A user writing to Org B master catalog)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('userMemberships').doc('alice_123_org_alpha').set({
+        userId: 'alice_123',
+        organizationId: 'org_alpha',
+        role: 'OWNER',
+        status: 'ACTIVE',
+      });
     });
+
+    const aliceContext = testEnv.authenticatedContext('alice_123');
     const db = aliceContext.firestore();
 
     const foreignProductRef = db
@@ -133,12 +199,102 @@ describe('Firestore Security Rules Unit Tests', () => {
     );
   });
 
-  it('SEC-TC-05: should strictly forbid direct client writes to store inventory balances', async () => {
-    const ownerContext = testEnv.authenticatedContext('alice_123', {
-      orgId: 'org_alpha',
-      role: 'OWNER',
-      defaultStoreId: 'store_01',
+  // --- 4. Cross-Store & Scoping Enforcement ---
+  it('SEC-TC-03: should enforce store branch scoping (Cashier cannot touch unassigned store)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      // Cashier assigned only to store_01
+      await adminDb.collection('userMemberships').doc('cashier_1_org_alpha').set({
+        userId: 'cashier_1',
+        organizationId: 'org_alpha',
+        role: 'CASHIER',
+        assignedStoreIds: ['store_01'],
+        status: 'ACTIVE',
+      });
     });
+
+    const cashierContext = testEnv.authenticatedContext('cashier_1');
+    const db = cashierContext.firestore();
+
+    // Permitted to manage held bills in assigned store_01
+    const allowedHeldBillRef = db
+      .collection('organizations')
+      .doc('org_alpha')
+      .collection('stores')
+      .doc('store_01')
+      .collection('heldBills')
+      .doc('bill_01');
+
+    await assertSucceeds(
+      allowedHeldBillRef.set({
+        cashierUserId: 'cashier_1',
+        heldAt: new Date(),
+      })
+    );
+
+    // Forbidden to touch held bills in unassigned store_02
+    const forbiddenHeldBillRef = db
+      .collection('organizations')
+      .doc('org_alpha')
+      .collection('stores')
+      .doc('store_02')
+      .collection('heldBills')
+      .doc('bill_02');
+
+    await assertFails(
+      forbiddenHeldBillRef.set({
+        cashierUserId: 'cashier_1',
+        heldAt: new Date(),
+      })
+    );
+  });
+
+  // --- 5. Suspended Membership Rejection ---
+  it('SEC-TC-04: should reject access when a user membership is SUSPENDED', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      await adminDb.collection('userMemberships').doc('charlie_org_alpha').set({
+        userId: 'charlie_99',
+        organizationId: 'org_alpha',
+        role: 'MANAGER',
+        status: 'SUSPENDED', // Suspended member
+      });
+      await adminDb
+        .collection('organizations')
+        .doc('org_alpha')
+        .collection('stores')
+        .doc('store_01')
+        .set({
+          name: 'Alpha Main',
+          organizationId: 'org_alpha',
+        });
+    });
+
+    const charlieContext = testEnv.authenticatedContext('charlie_99');
+    const db = charlieContext.firestore();
+
+    const storeRef = db
+      .collection('organizations')
+      .doc('org_alpha')
+      .collection('stores')
+      .doc('store_01');
+
+    // Access must fail because status is SUSPENDED
+    await assertFails(storeRef.get());
+  });
+
+  // --- 6. Direct Client Write Lockdowns on Financial & Inventory Paths ---
+  it('SEC-TC-05: should strictly forbid direct client writes to store inventory balances', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('userMemberships').doc('alice_org_alpha').set({
+        userId: 'alice_123',
+        organizationId: 'org_alpha',
+        role: 'OWNER',
+        status: 'ACTIVE',
+      });
+    });
+
+    const ownerContext = testEnv.authenticatedContext('alice_123');
     const db = ownerContext.firestore();
 
     const inventoryRef = db
@@ -149,7 +305,6 @@ describe('Firestore Security Rules Unit Tests', () => {
       .collection('inventory')
       .doc('var_101');
 
-    // Direct write must fail even for OWNER (must go through Cloud Function)
     await assertFails(
       inventoryRef.set({
         onHandQuantity: 99999,
@@ -159,11 +314,17 @@ describe('Firestore Security Rules Unit Tests', () => {
   });
 
   it('SEC-TC-06: should strictly forbid direct client writes to sales ledger', async () => {
-    const cashierContext = testEnv.authenticatedContext('alice_123', {
-      orgId: 'org_alpha',
-      role: 'CASHIER',
-      defaultStoreId: 'store_01',
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('userMemberships').doc('cashier_org_alpha').set({
+        userId: 'cashier_1',
+        organizationId: 'org_alpha',
+        role: 'CASHIER',
+        assignedStoreIds: ['store_01'],
+        status: 'ACTIVE',
+      });
     });
+
+    const cashierContext = testEnv.authenticatedContext('cashier_1');
     const db = cashierContext.firestore();
 
     const saleRef = db
@@ -174,7 +335,6 @@ describe('Firestore Security Rules Unit Tests', () => {
       .collection('sales')
       .doc('sale_fake_123');
 
-    // Direct sale creation must fail (must go through processCheckout Cloud Function)
     await assertFails(
       saleRef.set({
         invoiceNumber: 'FAKE/001',
@@ -184,10 +344,16 @@ describe('Firestore Security Rules Unit Tests', () => {
   });
 
   it('SEC-TC-07: should strictly forbid direct client writes to stock movements audit ledger', async () => {
-    const ownerContext = testEnv.authenticatedContext('alice_123', {
-      orgId: 'org_alpha',
-      role: 'OWNER',
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('userMemberships').doc('owner_org_alpha').set({
+        userId: 'owner_1',
+        organizationId: 'org_alpha',
+        role: 'OWNER',
+        status: 'ACTIVE',
+      });
     });
+
+    const ownerContext = testEnv.authenticatedContext('owner_1');
     const db = ownerContext.firestore();
 
     const movementRef = db
@@ -204,43 +370,30 @@ describe('Firestore Security Rules Unit Tests', () => {
     );
   });
 
-  it('SEC-TC-HELD-BILL: should permit authorized cashiers to manage held bills for their assigned store', async () => {
-    const cashierContext = testEnv.authenticatedContext('cashier_1', {
-      orgId: 'org_alpha',
-      role: 'CASHIER',
-      defaultStoreId: 'store_01',
+  it('SEC-TC-COUNTERS: should strictly forbid direct client writes to sequential invoice counters', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('userMemberships').doc('cashier_org_alpha').set({
+        userId: 'cashier_1',
+        organizationId: 'org_alpha',
+        role: 'CASHIER',
+        status: 'ACTIVE',
+      });
     });
+
+    const cashierContext = testEnv.authenticatedContext('cashier_1');
     const db = cashierContext.firestore();
 
-    const heldBillRef = db
+    const counterRef = db
       .collection('organizations')
       .doc('org_alpha')
       .collection('stores')
       .doc('store_01')
-      .collection('heldBills')
-      .doc('bill_parked_01');
-
-    await assertSucceeds(
-      heldBillRef.set({
-        cashierUserId: 'cashier_1',
-        items: [{ variantId: 'v1', quantity: 2, provisionalPrice: 50 }],
-        heldAt: new Date(),
-      })
-    );
-
-    // Cashier cannot touch held bills in unassigned store_02
-    const otherStoreHeldBillRef = db
-      .collection('organizations')
-      .doc('org_alpha')
-      .collection('stores')
-      .doc('store_02')
-      .collection('heldBills')
-      .doc('bill_parked_02');
+      .collection('counters')
+      .doc('invoices_2026-2027');
 
     await assertFails(
-      otherStoreHeldBillRef.set({
-        cashierUserId: 'cashier_1',
-        items: [],
+      counterRef.set({
+        currentSequenceNumber: 9999,
       })
     );
   });

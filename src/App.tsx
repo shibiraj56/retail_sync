@@ -1,16 +1,43 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { LoginPage } from './modules/auth/LoginPage';
-import { RegisterPage } from './modules/auth/RegisterPage';
-import { ForgotPasswordPage } from './modules/auth/ForgotPasswordPage';
+import { Loader2 } from 'lucide-react';
 import { ProtectedRoute } from './modules/auth/ProtectedRoute';
-import { OrganizationSetupPage } from './modules/organization/OrganizationSetupPage';
-import { StoreSetupPage } from './modules/organization/StoreSetupPage';
-import { TeamMembersPage } from './modules/organization/TeamMembersPage';
-import { SettingsPage } from './modules/organization/SettingsPage';
-import { DashboardPage } from './modules/dashboard/DashboardPage';
 import { AppLayout } from './components/layout/AppLayout';
+
+// Route-level Lazy Loading for optimized bundle splitting
+const LoginPage = lazy(() =>
+  import('./modules/auth/LoginPage').then((m) => ({ default: m.LoginPage }))
+);
+const RegisterPage = lazy(() =>
+  import('./modules/auth/RegisterPage').then((m) => ({ default: m.RegisterPage }))
+);
+const ForgotPasswordPage = lazy(() =>
+  import('./modules/auth/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage }))
+);
+const OrganizationSetupPage = lazy(() =>
+  import('./modules/organization/OrganizationSetupPage').then((m) => ({
+    default: m.OrganizationSetupPage,
+  }))
+);
+const StoreSetupPage = lazy(() =>
+  import('./modules/organization/StoreSetupPage').then((m) => ({ default: m.StoreSetupPage }))
+);
+const TeamMembersPage = lazy(() =>
+  import('./modules/organization/TeamMembersPage').then((m) => ({ default: m.TeamMembersPage }))
+);
+const SettingsPage = lazy(() =>
+  import('./modules/organization/SettingsPage').then((m) => ({ default: m.SettingsPage }))
+);
+const DashboardPage = lazy(() =>
+  import('./modules/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage }))
+);
+
+const PageLoadingFallback: React.FC = () => (
+  <div className="flex h-64 items-center justify-center">
+    <Loader2 className="w-6 h-6 animate-spin text-brand-600" />
+  </div>
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,27 +52,29 @@ export const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Routes>
-          {/* Public Auth Routes */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Suspense fallback={<PageLoadingFallback />}>
+          <Routes>
+            {/* Public Auth Routes */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-          {/* Protected Routes */}
-          <Route element={<ProtectedRoute />}>
-            <Route path="/setup-organization" element={<OrganizationSetupPage />} />
+            {/* Protected Routes */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/setup-organization" element={<OrganizationSetupPage />} />
 
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/stores" element={<StoreSetupPage />} />
-              <Route path="/team" element={<TeamMembersPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/stores" element={<StoreSetupPage />} />
+                <Route path="/team" element={<TeamMembersPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+              </Route>
             </Route>
-          </Route>
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </QueryClientProvider>
   );
