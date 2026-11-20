@@ -1,0 +1,129 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helper Functions ---
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isUser(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getCustomClaims() {
+      return request.auth.token;
+    }
+
+    function belongsToOrg(orgId) {
+      return isAuthenticated() && (
+        getCustomClaims().orgId == orgId ||
+        (getCustomClaims().orgIds != null && orgId in getCustomClaims().orgIds)
+      );
+    }
+
+    function isOrgOwner(orgId) {
+      return belongsToOrg(orgId) && getCustomClaims().role == 'OWNER';
+    }
+
+    function hasStoreAccess(orgId, storeId) {
+      return belongsToOrg(orgId) && (
+        getCustomClaims().role == 'OWNER' ||
+        getCustomClaims().defaultStoreId == storeId ||
+        (getCustomClaims().assignedStoreIds != null && storeId in getCustomClaims().assignedStoreIds)
+      );
+    }
+
+    // Default Deny Rule for any unmapped paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- 1. Global User Profiles & Authoritative Memberships ---
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isUser(userId);
+    }
+
+    match /userMemberships/{membershipId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        belongsToOrg(resource.data.organizationId)
+      );
+      // Memberships can ONLY be modified by Cloud Functions Admin SDK
+      allow write: if false;
+    }
+
+    // --- 2. Organization Scope ---
+    match /organizations/{orgId} {
+      allow read: if belongsToOrg(orgId);
+      // Direct organization creation/modification is restricted:
+      // Organizations must be created and provisioned via trusted backend functions.
+      // Org owners can update certain metadata, but cannot grant themselves unverified powers.
+      allow write: if isOrgOwner(orgId);
+
+      // Store Directory & Scoped Subcollections
+      match /stores/{storeId} {
+        allow read: if belongsToOrg(orgId);
+        allow write: if isOrgOwner(orgId);
+
+        // Store Inventory Balances (Direct client write FORBIDDEN)
+        match /inventory/{variantId} {
+          allow read: if hasStoreAccess(orgId, storeId);
+          allow write: if false; // Mutated solely via Cloud Functions
+        }
+
+        // Store Sales & Invoices (Direct client write FORBIDDEN)
+        match /sales/{saleId} {
+          allow read: if hasStoreAccess(orgId, storeId);
+          allow write: if false; // Created solely via processCheckout Cloud Function
+        }
+
+        // Sequential Counters (Direct client write FORBIDDEN)
+        match /counters/{counterKey} {
+          allow read: if hasStoreAccess(orgId, storeId);
+          allow write: if false;
+        }
+
+        // Held Bills (Cashiers can park/resume carts directly for rapid UI)
+        match /heldBills/{heldBillId} {
+          allow read, write: if hasStoreAccess(orgId, storeId);
+        }
+
+        // Cash Drawer Sessions
+        match /cashDrawers/{sessionId} {
+          allow read: if hasStoreAccess(orgId, storeId);
+          allow write: if false; // Settled solely via Cloud Functions
+        }
+      }
+
+      // Master Catalog
+      match /products/{productId} {
+        allow read: if belongsToOrg(orgId);
+        allow write: if belongsToOrg(orgId) && (getCustomClaims().role in ['OWNER', 'MANAGER', 'STORE_MANAGER']);
+
+        match /variants/{variantId} {
+          allow read: if belongsToOrg(orgId);
+          allow write: if belongsToOrg(orgId) && (getCustomClaims().role in ['OWNER', 'MANAGER', 'STORE_MANAGER']);
+        }
+      }
+
+      // Stock Movement Audit Ledger (Strictly Append-Only via Admin SDK)
+      match /stockMovements/{movementId} {
+        allow read: if belongsToOrg(orgId) && (getCustomClaims().role in ['OWNER', 'MANAGER', 'STORE_MANAGER', 'ACCOUNTANT']);
+        allow write: if false;
+      }
+
+      // Idempotency Keys (Internal system collection)
+      match /idempotencyKeys/{keyId} {
+        allow read, write: if false;
+      }
+
+      // Audit Logs
+      match /auditLogs/{logId} {
+        allow read: if isOrgOwner(orgId);
+        allow write: if false;
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "common": {
+    "appName": "Retail Sync",
+    "dashboard": "Dashboard",
+    "stores": "Store Branches",
+    "team": "Team & Access",
+    "settings": "Settings",
+    "signOut": "Sign Out",
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "submit": "Submit",
+    "active": "Active",
+    "suspended": "Suspended",
+    "invited": "Invited"
+  },
+  "auth": {
+    "signInTitle": "Sign In to Terminal",
+    "signInSubtitle": "Enter your operational credentials to continue",
+    "email": "Email Address",
+    "password": "Password",
+    "signIn": "Sign In",
+    "register": "Register an organization",
+    "forgotPassword": "Forgot password?"
+  }
+}
