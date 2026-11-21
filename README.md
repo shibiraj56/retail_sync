@@ -197,3 +197,5 @@ pnpm lint
 - Direct client writes to `/userMemberships` are strictly forbidden (`allow write: if false`).
 - Direct client writes to inventory, sales ledgers, stock movements, and sequential counters are strictly forbidden. All state mutations must pass through validated Cloud Functions v2.
 - Cross-tenant reads and writes are blocked by checking `request.auth.token.orgId == orgId`.
+#   r e t a i l _ s y n c  
+ 
