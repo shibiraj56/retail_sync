@@ -32,6 +32,15 @@ const SettingsPage = lazy(() =>
 const DashboardPage = lazy(() =>
   import('./modules/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage }))
 );
+const CategoryListPage = lazy(() =>
+  import('./modules/catalog/CategoryListPage').then((m) => ({ default: m.CategoryListPage }))
+);
+const BrandListPage = lazy(() =>
+  import('./modules/catalog/BrandListPage').then((m) => ({ default: m.BrandListPage }))
+);
+const UomListPage = lazy(() =>
+  import('./modules/catalog/UomListPage').then((m) => ({ default: m.UomListPage }))
+);
 
 const PageLoadingFallback: React.FC = () => (
   <div className="flex h-64 items-center justify-center">
@@ -68,6 +77,10 @@ export const App: React.FC = () => {
                 <Route path="/stores" element={<StoreSetupPage />} />
                 <Route path="/team" element={<TeamMembersPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                {/* Phase 2 Master Data Routes */}
+                <Route path="/catalog/categories" element={<CategoryListPage />} />
+                <Route path="/catalog/brands" element={<BrandListPage />} />
+                <Route path="/catalog/uom" element={<UomListPage />} />
               </Route>
             </Route>
 

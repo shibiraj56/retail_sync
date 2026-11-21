@@ -397,4 +397,165 @@ describe('Firestore Security Rules Comprehensive Security Audit Test Suite', () 
       })
     );
   });
+
+  // --- 8. Phase 2 Master Data & Customer Safeguards ---
+  it('SEC-TC-CATALOG-WRITE: should strictly forbid direct client writes to categories, brands, UoMs and registries', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('userMemberships').doc('owner_org_alpha').set({
+        userId: 'owner_1',
+        organizationId: 'org_alpha',
+        role: 'OWNER',
+        status: 'ACTIVE',
+      });
+    });
+
+    const ownerContext = testEnv.authenticatedContext('owner_1');
+    const db = ownerContext.firestore();
+
+    // Direct write to categories
+    await assertFails(
+      db.collection('organizations').doc('org_alpha').collection('categories').doc('cat_1').set({
+        name: 'Direct Category',
+      })
+    );
+
+    // Direct write to brands
+    await assertFails(
+      db.collection('organizations').doc('org_alpha').collection('brands').doc('brand_1').set({
+        name: 'Direct Brand',
+      })
+    );
+
+    // Direct write to unitsOfMeasure
+    await assertFails(
+      db.collection('organizations').doc('org_alpha').collection('unitsOfMeasure').doc('uom_1').set({
+        name: 'Direct UoM',
+      })
+    );
+
+    // Direct write to codeRegistry
+    await assertFails(
+      db.collection('organizations').doc('org_alpha').collection('codeRegistry').doc('CATEGORY_CODE').set({
+        targetDocumentId: 'cat_1',
+      })
+    );
+  });
+
+  it('SEC-TC-CUSTOMER-CASHIER: should allow Cashier to create and update B2C customer contact, but reject B2B or status tampering', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      await adminDb.collection('userMemberships').doc('cashier_cust_1_org_alpha').set({
+        userId: 'cashier_cust_1',
+        organizationId: 'org_alpha',
+        role: 'CASHIER',
+        status: 'ACTIVE',
+      });
+      // Seed an existing customer
+      await adminDb.collection('organizations').doc('org_alpha').collection('customers').doc('cust_existing').set({
+        id: 'cust_existing',
+        organizationId: 'org_alpha',
+        name: 'John Doe',
+        phone: '+919876543210',
+        type: 'B2C_RETAIL',
+        status: 'ACTIVE',
+        createdAt: '2026-11-21T00:00:00Z',
+        updatedAt: '2026-11-21T00:00:00Z',
+      });
+    });
+
+    const cashierContext = testEnv.authenticatedContext('cashier_cust_1');
+    const db = cashierContext.firestore();
+
+    // 1. Cashier CAN create valid B2C customer with exact allowlist
+    const validCustomerRef = db.collection('organizations').doc('org_alpha').collection('customers').doc('cust_new_b2c');
+    await assertSucceeds(
+      validCustomerRef.set({
+        id: 'cust_new_b2c',
+        organizationId: 'org_alpha',
+        name: 'Jane Retail',
+        phone: '+919876543211',
+        type: 'B2C_RETAIL',
+        status: 'ACTIVE',
+        createdAt: '2026-11-21T00:00:00Z',
+        updatedAt: '2026-11-21T00:00:00Z',
+      })
+    );
+
+    // 2. Cashier CANNOT create B2B customer
+    const b2bCustomerRef = db.collection('organizations').doc('org_alpha').collection('customers').doc('cust_new_b2b');
+    await assertFails(
+      b2bCustomerRef.set({
+        id: 'cust_new_b2b',
+        organizationId: 'org_alpha',
+        name: 'Acme Corp',
+        phone: '+919876543212',
+        type: 'B2B_WHOLESALE',
+        status: 'ACTIVE',
+        createdAt: '2026-11-21T00:00:00Z',
+        updatedAt: '2026-11-21T00:00:00Z',
+      })
+    );
+
+    // 3. Cashier CANNOT inject creditLimit or b2bData during creation
+    const privilegedCustomerRef = db.collection('organizations').doc('org_alpha').collection('customers').doc('cust_hack');
+    await assertFails(
+      privilegedCustomerRef.set({
+        id: 'cust_hack',
+        organizationId: 'org_alpha',
+        name: 'Hacker',
+        phone: '+919876543213',
+        type: 'B2C_RETAIL',
+        status: 'ACTIVE',
+        creditLimit: 50000,
+        createdAt: '2026-11-21T00:00:00Z',
+        updatedAt: '2026-11-21T00:00:00Z',
+      })
+    );
+
+    // 4. Cashier CAN update allowed contact fields on existing customer
+    const existingRef = db.collection('organizations').doc('org_alpha').collection('customers').doc('cust_existing');
+    await assertSucceeds(
+      existingRef.update({
+        phone: '+919876543999',
+        email: 'john.doe@gmail.com',
+        updatedAt: '2026-11-21T10:00:00Z',
+      })
+    );
+
+    // 5. Cashier CANNOT change customer status to BLOCKED or tamper with type
+    await assertFails(
+      existingRef.update({
+        status: 'BLOCKED',
+      })
+    );
+
+    // 6. Direct delete is forbidden
+    await assertFails(existingRef.delete());
+  });
+
+  it('SEC-TC-CUSTOMER-INVENTORY-MGR: should forbid Inventory Manager from creating or updating customers', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('userMemberships').doc('inv_org_alpha').set({
+        userId: 'inv_1',
+        organizationId: 'org_alpha',
+        role: 'INVENTORY_MANAGER',
+        status: 'ACTIVE',
+      });
+    });
+
+    const invContext = testEnv.authenticatedContext('inv_1');
+    const db = invContext.firestore();
+
+    const customerRef = db.collection('organizations').doc('org_alpha').collection('customers').doc('cust_inv_test');
+    await assertFails(
+      customerRef.set({
+        id: 'cust_inv_test',
+        organizationId: 'org_alpha',
+        name: 'Should Fail',
+        phone: '+919876543222',
+        type: 'B2C_RETAIL',
+        status: 'ACTIVE',
+      })
+    );
+  });
 });

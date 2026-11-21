@@ -58,3 +58,24 @@ export const updateFiscalYear = onCall(functionOptions, updateFiscalYearHandler)
  * Update organization held bill expiration settings (1 to 72 hours)
  */
 export const updateHeldBillSettings = onCall(functionOptions, updateHeldBillSettingsHandler);
+
+// ============================================================================
+// PHASE 2 MASTER DATA MANAGEMENT (PIM)
+// ============================================================================
+
+export {
+  upsertCategory,
+  archiveCategory,
+} from './modules/catalog/categories';
+
+export {
+  upsertBrand,
+  archiveBrand,
+} from './modules/catalog/brands';
+
+export {
+  upsertUnitOfMeasure,
+  seedDefaultUnitsOfMeasure,
+  archiveUnitOfMeasure,
+} from './modules/catalog/unitsOfMeasure';
+

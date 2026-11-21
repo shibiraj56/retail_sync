@@ -36,6 +36,10 @@ service cloud.firestore {
       );
     }
 
+    function isCashier(orgId) {
+      return hasActiveMembership(orgId) && getMembershipDoc(orgId).role == 'CASHIER';
+    }
+
     // Enforces store-level authorization against authoritative membership document
     function hasStoreAccess(orgId, storeId) {
       return hasActiveMembership(orgId) && (
@@ -120,15 +124,93 @@ service cloud.firestore {
         }
       }
 
-      // Master Catalog
+      // --- Master Reference Data (Mutated solely via Cloud Functions) ---
+      match /categories/{id} {
+        allow read: if hasActiveMembership(orgId);
+        allow write: if false;
+      }
+
+      match /brands/{id} {
+        allow read: if hasActiveMembership(orgId);
+        allow write: if false;
+      }
+
+      match /unitsOfMeasure/{id} {
+        allow read: if hasActiveMembership(orgId);
+        allow write: if false;
+      }
+
+      // --- Master Catalog & Variants (Mutated solely via Cloud Functions) ---
       match /products/{productId} {
         allow read: if hasActiveMembership(orgId);
-        allow write: if isOrgManager(orgId);
+        allow write: if false;
 
         match /variants/{variantId} {
           allow read: if hasActiveMembership(orgId);
-          allow write: if isOrgManager(orgId);
+          allow write: if false;
         }
+      }
+
+      // --- Transactional Identifier Registries (Direct Client Writes FORBIDDEN) ---
+      match /codeRegistry/{code} {
+        allow read: if hasActiveMembership(orgId);
+        allow write: if false;
+      }
+
+      match /skuRegistry/{sku} {
+        allow read: if hasActiveMembership(orgId);
+        allow write: if false;
+      }
+
+      match /barcodeRegistry/{barcode} {
+        allow read: if hasActiveMembership(orgId);
+        allow write: if false;
+      }
+
+      // --- Supplier Directory (Mutated solely via Cloud Functions) ---
+      match /suppliers/{supplierId} {
+        allow read: if hasActiveMembership(orgId);
+        allow write: if false;
+      }
+
+      // --- Customer Directory (Granular Allowlist & Cashier Restrictions) ---
+      match /customers/{customerId} {
+        allow read: if hasActiveMembership(orgId);
+
+        // CREATE:
+        // - OWNER and MANAGER: Full creation access
+        // - CASHIER: Strict field allowlist, organizationId assertion, strictly B2C_RETAIL, status ACTIVE, zero B2B/credit fields
+        allow create: if isOrgManager(orgId) || (
+          isCashier(orgId) &&
+          request.resource.data.organizationId == orgId &&
+          request.resource.data.type == 'B2C_RETAIL' &&
+          request.resource.data.status == 'ACTIVE' &&
+          !('b2bData' in request.resource.data) &&
+          !('creditLimit' in request.resource.data) &&
+          !('outstandingBalance' in request.resource.data) &&
+          request.resource.data.keys().hasOnly([
+            'id', 'organizationId', 'name', 'phone', 'alternatePhone', 'email', 'type', 'billingAddress', 'shippingAddress', 'status', 'createdAt', 'updatedAt'
+          ])
+        );
+
+        // UPDATE:
+        // - OWNER and MANAGER: Full update access
+        // - CASHIER: Can ONLY update permitted contact/address fields on ACTIVE customers; cannot touch type, status, b2bData, credit fields
+        allow update: if isOrgManager(orgId) || (
+          isCashier(orgId) &&
+          resource.data.status == 'ACTIVE' &&
+          request.resource.data.organizationId == orgId &&
+          request.resource.data.type == resource.data.type &&
+          request.resource.data.status == resource.data.status &&
+          !('b2bData' in request.resource.data.diff(resource.data).affectedKeys()) &&
+          !('creditLimit' in request.resource.data.diff(resource.data).affectedKeys()) &&
+          !('outstandingBalance' in request.resource.data.diff(resource.data).affectedKeys()) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name', 'phone', 'alternatePhone', 'email', 'billingAddress', 'shippingAddress', 'updatedAt'
+          ])
+        );
+
+        allow delete: if false;
       }
 
       // Stock Movement Audit Ledger (Strictly Append-Only via Admin SDK)

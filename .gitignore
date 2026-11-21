@@ -35,3 +35,8 @@ Thumbs.db
 # Testing & Coverage
 coverage/
 .nyc_output/
+
+# Build caches & CLI configs
+*.tsbuildinfo
+.config/
+

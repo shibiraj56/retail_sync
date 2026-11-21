@@ -1,0 +1,124 @@
+[debug] [2026-11-21T05:31:36.226Z] ----------------------------------------------------------------------
+[debug] [2026-11-21T05:31:36.229Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\shibi\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js emulators:start --only auth firestore functions
+[debug] [2026-11-21T05:31:36.229Z] CLI Version:   15.37.0
+[debug] [2026-11-21T05:31:36.229Z] Platform:      win32
+[debug] [2026-11-21T05:31:36.229Z] Node Version:  v24.22.0
+[debug] [2026-11-21T05:31:36.229Z] Detected Agent: antigravity
+[debug] [2026-11-21T05:31:36.229Z] Time:          Sat Nov 21 2026 11:01:36 GMT+0530 (India Standard Time)
+[debug] [2026-11-21T05:31:36.229Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-11-21T05:31:38.897Z] Resolved Java binary from java.home: C:\Program Files\Eclipse Adoptium\jdk-25.0.4.101-hotspot\bin\java.exe
+[debug] [2026-11-21T05:31:38.898Z] Parsed Java major version: 25
+[info] i  emulators: Starting emulators: auth, functions, firestore {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: auth, functions, firestore"}}
+[info] i  emulators: Detected demo project ID "demo-retail-sync", emulated services will use a demo configuration and attempts to access non-emulated services for this project will fail. {"metadata":{"emulator":{"name":"hub"},"message":"Detected demo project ID \"demo-retail-sync\", emulated services will use a demo configuration and attempts to access non-emulated services for this project will fail."}}
+[debug] [2026-11-21T05:31:38.931Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-11-21T05:31:38.932Z] assigned listening specs for emulators {"user":{"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000}],"auth":[{"address":"127.0.0.1","family":"IPv4","port":9099}],"firestore":[{"address":"127.0.0.1","family":"IPv4","port":8080}],"firestore.websocket":[{"address":"127.0.0.1","family":"IPv4","port":9150}],"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}]},"metadata":{"message":"assigned listening specs for emulators"}}
+[debug] [2026-11-21T05:31:38.941Z] Write emulator hub locator at C:\Users\shibi\AppData\Local\Temp\hub-demo-retail-sync.json
+[debug] [2026-11-21T05:31:38.968Z] [eventarc] Eventarc Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-11-21T05:31:38.968Z] [tasks] Cloud Tasks Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-11-21T05:31:38.968Z] late-assigned ports for functions and eventarc emulators {"user":{"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000}],"auth":[{"address":"127.0.0.1","family":"IPv4","port":9099}],"firestore":[{"address":"127.0.0.1","family":"IPv4","port":8080}],"firestore.websocket":[{"address":"127.0.0.1","family":"IPv4","port":9150}],"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"functions":[{"address":"127.0.0.1","family":"IPv4","port":5001}],"eventarc":[{"address":"127.0.0.1","family":"IPv4","port":9299}],"tasks":[{"address":"127.0.0.1","family":"IPv4","port":9499}]},"metadata":{"message":"late-assigned ports for functions and eventarc emulators"}}
+[debug] [2026-11-21T05:31:39.138Z] Ignoring unsupported arg: auto_download {"metadata":{"emulator":{"name":"firestore"},"message":"Ignoring unsupported arg: auto_download"}}
+[debug] [2026-11-21T05:31:39.138Z] Ignoring unsupported arg: single_project_mode_error {"metadata":{"emulator":{"name":"firestore"},"message":"Ignoring unsupported arg: single_project_mode_error"}}
+[debug] [2026-11-21T05:31:39.138Z] Starting Firestore Emulator with command {"binary":"C:\\Program Files\\Eclipse Adoptium\\jdk-25.0.4.101-hotspot\\bin\\java.exe","args":["-Dgoogle.cloud_firestore.debug_log_level=FINE","-Duser.language=en","-jar","C:\\Users\\shibi\\.cache\\firebase\\emulators\\cloud-firestore-emulator-v1.22.0.jar","--host","127.0.0.1","--port",8080,"--websocket_port",9150,"--database-edition","standard","--project_id","demo-retail-sync","--rules","D:\\Retail Sync\\firestore.rules","--single_project_mode",true,"--functions_emulator","127.0.0.1:5001"],"optionalArgs":["port","webchannel_port","host","rules","websocket_port","database-edition","functions_emulator","seed_from_export","project_id","single_project_mode"],"joinArgs":false,"shell":false,"port":8080} {"metadata":{"emulator":{"name":"firestore"},"message":"Starting Firestore Emulator with command {\"binary\":\"C:\\\\Program Files\\\\Eclipse Adoptium\\\\jdk-25.0.4.101-hotspot\\\\bin\\\\java.exe\",\"args\":[\"-Dgoogle.cloud_firestore.debug_log_level=FINE\",\"-Duser.language=en\",\"-jar\",\"C:\\\\Users\\\\shibi\\\\.cache\\\\firebase\\\\emulators\\\\cloud-firestore-emulator-v1.22.0.jar\",\"--host\",\"127.0.0.1\",\"--port\",8080,\"--websocket_port\",9150,\"--database-edition\",\"standard\",\"--project_id\",\"demo-retail-sync\",\"--rules\",\"D:\\\\Retail Sync\\\\firestore.rules\",\"--single_project_mode\",true,\"--functions_emulator\",\"127.0.0.1:5001\"],\"optionalArgs\":[\"port\",\"webchannel_port\",\"host\",\"rules\",\"websocket_port\",\"database-edition\",\"functions_emulator\",\"seed_from_export\",\"project_id\",\"single_project_mode\"],\"joinArgs\":false,\"shell\":false,\"port\":8080}"}}
+[info] i  firestore: Firestore Emulator logging to firestore-debug.log {"metadata":{"emulator":{"name":"firestore"},"message":"Firestore Emulator logging to \u001b[1mfirestore-debug.log\u001b[22m"}}
+[debug] [2026-11-21T05:31:39.681Z] WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::allocateMemory has been called by io.netty.util.internal.PlatformDependent0$2 (file:/C:/Users/shibi/.cache/firebase/emulators/cloud-firestore-emulator-v1.22.0.jar)
+WARNING: Please consider reporting this to the maintainers of class io.netty.util.internal.PlatformDependent0$2
+WARNING: sun.misc.Unsafe::allocateMemory will be removed in a future release
+ {"metadata":{"emulator":{"name":"firestore"},"message":"WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::allocateMemory has been called by io.netty.util.internal.PlatformDependent0$2 (file:/C:/Users/shibi/.cache/firebase/emulators/cloud-firestore-emulator-v1.22.0.jar)\nWARNING: Please consider reporting this to the maintainers of class io.netty.util.internal.PlatformDependent0$2\nWARNING: sun.misc.Unsafe::allocateMemory will be removed in a future release\r\n"}}
+[debug] [2026-11-21T05:31:41.000Z] Nov 21, 2026 11:01:40 AM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketServer start
+INFO: Started WebSocket server on ws://127.0.0.1:9150
+ {"metadata":{"emulator":{"name":"firestore"},"message":"Nov 21, 2026 11:01:40 AM com.google.cloud.datastore.emulator.firestore.websocket.WebSocketServer start\r\nINFO: Started WebSocket server on ws://127.0.0.1:9150\r\n"}}
+[debug] [2026-11-21T05:31:41.053Z] 
+API endpoint: http://127.0.0.1:8080
+Database Edition: STANDARD
+Database Mode: CLOUD_FIRESTORE
+
+ {"metadata":{"emulator":{"name":"firestore"},"message":"\nAPI endpoint: http://127.0.0.1:8080\nDatabase Edition: STANDARD\nDatabase Mode: CLOUD_FIRESTORE\n\n"}}
+[debug] [2026-11-21T05:31:41.054Z] If you are using a library that supports the FIRESTORE_EMULATOR_HOST environment variable, run:
+
+   export FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
+
+If you are running a Firestore in Datastore Mode project, run:
+
+   export DATASTORE_EMULATOR_HOST=127.0.0.1:8080
+
+Note: Support for Datastore Mode is in preview. If you encounter any bugs please file at https://github.com/firebase/firebase-tools/issues.
+Dev App Server is now running.
+
+ {"metadata":{"emulator":{"name":"firestore"},"message":"If you are using a library that supports the FIRESTORE_EMULATOR_HOST environment variable, run:\r\n\n   export FIRESTORE_EMULATOR_HOST=127.0.0.1:8080\n\nIf you are running a Firestore in Datastore Mode project, run:\r\n\n   export DATASTORE_EMULATOR_HOST=127.0.0.1:8080\n\nNote: Support for Datastore Mode is in preview. If you encounter any bugs please file at https://github.com/firebase/firebase-tools/issues.\r\nDev App Server is now running.\n\r\n"}}
+[info] +  firestore: Firestore Emulator was started in standard edition. {"metadata":{"emulator":{"name":"firestore"},"message":"Firestore Emulator was started in standard edition."}}
+[info] +  firestore: Firestore Emulator UI websocket is running on 9150. {"metadata":{"emulator":{"name":"firestore"},"message":"Firestore Emulator UI websocket is running on 9150."}}
+[info] i  functions: Watching "D:\Retail Sync\functions" for Cloud Functions... {"metadata":{"emulator":{"name":"functions"},"message":"Watching \"D:\\Retail Sync\\functions\" for Cloud Functions..."}}
+[debug] [2026-11-21T05:31:42.043Z] Validating nodejs source
+[debug] [2026-11-21T05:31:43.850Z] > [functions] package.json contents: {
+  "name": "retail-sync-functions",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Cloud Functions backend for Retail Sync",
+  "main": "lib/index.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.5.0",
+    "firebase-functions": "^5.1.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.5",
+    "firebase-functions-test": "^3.3.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.1"
+  }
+}
+[debug] [2026-11-21T05:31:43.850Z] Building nodejs source
+[debug] [2026-11-21T05:31:43.851Z] Failed to find version of module node: reached end of search path D:\Retail Sync\functions\node_modules
+[warn] !  functions: Your requested "node" version "20" doesn't match your global version "24". Using node@24 from host. 
+[debug] [2026-11-21T05:31:43.854Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-11-21T05:31:43.872Z] Found firebase-functions binary at 'D:\Retail Sync\functions\node_modules\.bin\firebase-functions'
+[info] Serving at port 8886
+
+[debug] [2026-11-21T05:31:45.451Z] Got response from /__/functions.yaml {"endpoints":{"syncUser":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["asia-south1"],"labels":{},"callableTrigger":{},"entryPoint":"syncUser"},"provisionOrganization":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["asia-south1"],"labels":{},"callableTrigger":{},"entryPoint":"provisionOrganization"},"createStore":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["asia-south1"],"labels":{},"callableTrigger":{},"entryPoint":"createStore"},"inviteMember":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["asia-south1"],"labels":{},"callableTrigger":{},"entryPoint":"inviteMember"},"updateMembership":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["asia-south1"],"labels":{},"callableTrigger":{},"entryPoint":"updateMembership"},"updateFiscalYear":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["asia-south1"],"labels":{},"callableTrigger":{},"entryPoint":"updateFiscalYear"},"updateHeldBillSettings":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["asia-south1"],"labels":{},"callableTrigger":{},"entryPoint":"updateHeldBillSettings"},"upsertCategory":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["asia-south1"],"labels":{},"callableTrigger":{},"entryPoint":"upsertCategory"},"archiveCategory":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["asia-south1"],"labels":{},"callableTrigger":{},"entryPoint":"archiveCategory"},"upsertBrand":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["asia-south1"],"labels":{},"callableTrigger":{},"entryPoint":"upsertBrand"},"archiveBrand":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["asia-south1"],"labels":{},"callableTrigger":{},"entryPoint":"archiveBrand"},"upsertUnitOfMeasure":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["asia-south1"],"labels":{},"callableTrigger":{},"entryPoint":"upsertUnitOfMeasure"},"seedDefaultUnitsOfMeasure":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["asia-south1"],"labels":{},"callableTrigger":{},"entryPoint":"seedDefaultUnitsOfMeasure"},"archiveUnitOfMeasure":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["asia-south1"],"labels":{},"callableTrigger":{},"entryPoint":"archiveUnitOfMeasure"}},"specVersion":"v1alpha1","requiredAPIs":[],"extensions":{}}
+[info] +  functions: Loaded functions definitions from source: syncUser, provisionOrganization, createStore, inviteMember, updateMembership, updateFiscalYear, updateHeldBillSettings, upsertCategory, archiveCategory, upsertBrand, archiveBrand, upsertUnitOfMeasure, seedDefaultUnitsOfMeasure, archiveUnitOfMeasure. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: syncUser, provisionOrganization, createStore, inviteMember, updateMembership, updateFiscalYear, updateHeldBillSettings, upsertCategory, archiveCategory, upsertBrand, archiveBrand, upsertUnitOfMeasure, seedDefaultUnitsOfMeasure, archiveUnitOfMeasure."}}
+[info] +  functions[asia-south1-syncUser]: http function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/syncUser). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/syncUser)."}}
+[info] +  functions[asia-south1-provisionOrganization]: http function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/provisionOrganization). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/provisionOrganization)."}}
+[info] +  functions[asia-south1-createStore]: http function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/createStore). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/createStore)."}}
+[info] +  functions[asia-south1-inviteMember]: http function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/inviteMember). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/inviteMember)."}}
+[info] +  functions[asia-south1-updateMembership]: http function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/updateMembership). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/updateMembership)."}}
+[info] +  functions[asia-south1-updateFiscalYear]: http function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/updateFiscalYear). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/updateFiscalYear)."}}
+[info] +  functions[asia-south1-updateHeldBillSettings]: http function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/updateHeldBillSettings). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/updateHeldBillSettings)."}}
+[info] +  functions[asia-south1-upsertCategory]: http function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/upsertCategory). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/upsertCategory)."}}
+[info] +  functions[asia-south1-archiveCategory]: http function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/archiveCategory). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/archiveCategory)."}}
+[info] +  functions[asia-south1-upsertBrand]: http function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/upsertBrand). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/upsertBrand)."}}
+[info] +  functions[asia-south1-archiveBrand]: http function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/archiveBrand). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/archiveBrand)."}}
+[info] +  functions[asia-south1-upsertUnitOfMeasure]: http function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/upsertUnitOfMeasure). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/upsertUnitOfMeasure)."}}
+[info] +  functions[asia-south1-seedDefaultUnitsOfMeasure]: http function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/seedDefaultUnitsOfMeasure). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/seedDefaultUnitsOfMeasure)."}}
+[info] +  functions[asia-south1-archiveUnitOfMeasure]: http function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/archiveUnitOfMeasure). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/demo-retail-sync/asia-south1/archiveUnitOfMeasure)."}}
+[debug] [2026-11-21T05:31:48.578Z] Could not find VSCode notification endpoint: TypeError: fetch failed. If you are not running the Firebase SQL Connect VSCode extension, this is expected and not an issue.
+[info] 
+┌─────────────────────────────────────────────────────────────┐
+│ ✔  All emulators ready! It is now safe to connect your app. │
+│ i  View Emulator UI at http://127.0.0.1:4000/               │
+└─────────────────────────────────────────────────────────────┘
+
+┌────────────────┬────────────────┬─────────────────────────────────┐
+│ Emulator       │ Host:Port      │ View in Emulator UI             │
+├────────────────┼────────────────┼─────────────────────────────────┤
+│ Authentication │ 127.0.0.1:9099 │ http://127.0.0.1:4000/auth      │
+├────────────────┼────────────────┼─────────────────────────────────┤
+│ Functions      │ 127.0.0.1:5001 │ http://127.0.0.1:4000/functions │
+├────────────────┼────────────────┼─────────────────────────────────┤
+│ Firestore      │ 127.0.0.1:8080 │ http://127.0.0.1:4000/firestore │
+└────────────────┴────────────────┴─────────────────────────────────┘
+  Emulator Hub host: 127.0.0.1 port: 4400
+  Other reserved ports: 4500, 9150
+
+Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
+ 

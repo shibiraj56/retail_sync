@@ -6,6 +6,9 @@ import {
   Users,
   Settings,
   Building2,
+  FolderTree,
+  Tag,
+  Scale,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { StoreSwitcher } from './StoreSwitcher';
@@ -35,6 +38,24 @@ export const Sidebar: React.FC = () => {
       to: '/settings',
       label: 'Settings & Policy',
       icon: <Settings className="w-4 h-4" />,
+    },
+  ];
+
+  const catalogLinks = [
+    {
+      to: '/catalog/categories',
+      label: 'Categories',
+      icon: <FolderTree className="w-4 h-4" />,
+    },
+    {
+      to: '/catalog/brands',
+      label: 'Brands',
+      icon: <Tag className="w-4 h-4" />,
+    },
+    {
+      to: '/catalog/uom',
+      label: 'Units of Measure',
+      icon: <Scale className="w-4 h-4" />,
     },
   ];
 
@@ -93,6 +114,26 @@ export const Sidebar: React.FC = () => {
             key={link.to}
             to={link.to}
             end={link.end}
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                isActive
+                  ? 'bg-brand-50 text-brand-700 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              }`
+            }
+          >
+            <span className="text-slate-400 group-hover:text-slate-600">{link.icon}</span>
+            <span>{link.label}</span>
+          </NavLink>
+        ))}
+
+        <div className="pt-3 px-2 py-1 text-3xs font-bold text-slate-400 uppercase tracking-wider">
+          Master Data (PIM)
+        </div>
+        {catalogLinks.map((link) => (
+          <NavLink
+            key={link.to}
+            to={link.to}
             className={({ isActive }) =>
               `flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                 isActive
