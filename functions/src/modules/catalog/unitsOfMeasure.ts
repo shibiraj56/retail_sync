@@ -228,6 +228,37 @@ export const archiveUnitOfMeasure = onCall(
         throw new ValidationError('Cannot archive a system default unit of measure');
       }
 
+      // Check if products reference this UoM as base or secondary unit
+      const baseUomProducts = await db
+        .collection('organizations')
+        .doc(organizationId)
+        .collection('products')
+        .where('baseUomId', '==', uomId)
+        .where('status', 'in', ['ACTIVE', 'INACTIVE'])
+        .limit(1)
+        .get();
+
+      if (!baseUomProducts.empty) {
+        throw new ValidationError(
+          'Cannot archive Unit of Measure because it is configured as base unit for existing products.'
+        );
+      }
+
+      const secUomProducts = await db
+        .collection('organizations')
+        .doc(organizationId)
+        .collection('products')
+        .where('secondaryUomId', '==', uomId)
+        .where('status', 'in', ['ACTIVE', 'INACTIVE'])
+        .limit(1)
+        .get();
+
+      if (!secUomProducts.empty) {
+        throw new ValidationError(
+          'Cannot archive Unit of Measure because it is configured as secondary unit for existing products.'
+        );
+      }
+
       await uomRef.update({
         status: 'ARCHIVED',
         updatedAt: firestore.Timestamp.now(),

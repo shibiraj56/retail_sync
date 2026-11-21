@@ -1,5 +1,5 @@
-import * as admin from 'firebase-admin';
 import type { CallableRequest } from 'firebase-functions/v2/https';
+import { Timestamp } from 'firebase-admin/firestore';
 import { db, auth } from '../../config/firebase';
 import { requireAuth } from '../../middleware/auth';
 import { logAuditEvent } from '../../middleware/audit';
@@ -39,7 +39,7 @@ export async function provisionOrganizationHandler(request: CallableRequest): Pr
     const membershipRef = db.collection('userMemberships').doc(membershipId);
     const userRef = db.collection('users').doc(user.uid);
 
-    const now = admin.firestore.Timestamp.now();
+    const now = Timestamp.now();
 
     // Industry vertical feature presets
     const featuresEnabled = {

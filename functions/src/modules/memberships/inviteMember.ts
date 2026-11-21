@@ -1,5 +1,5 @@
-import * as admin from 'firebase-admin';
 import type { CallableRequest } from 'firebase-functions/v2/https';
+import { Timestamp } from 'firebase-admin/firestore';
 import { db, auth } from '../../config/firebase';
 import { requirePermission } from '../../middleware/auth';
 import { logAuditEvent } from '../../middleware/audit';
@@ -55,7 +55,7 @@ export async function inviteMemberHandler(request: CallableRequest): Promise<{
       }
     }
 
-    const now = admin.firestore.Timestamp.now();
+    const now = Timestamp.now();
     const newMembership: UserMembershipDocument = {
       id: membershipId,
       userId: targetUid,

@@ -1,5 +1,5 @@
 import { db } from '../config/firebase';
-import * as admin from 'firebase-admin';
+import { Timestamp } from 'firebase-admin/firestore';
 import type { AuditLogDocument, UserRole } from '../shared/types';
 
 interface AuditLogParams {
@@ -36,7 +36,7 @@ export async function logAuditEvent(params: AuditLogParams): Promise<void> {
       details: params.details,
       ipAddress: params.ipAddress,
       userAgent: params.userAgent,
-      timestamp: admin.firestore.Timestamp.now(),
+      timestamp: Timestamp.now(),
     };
 
     await auditRef.set(auditEntry);

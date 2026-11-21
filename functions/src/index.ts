@@ -79,3 +79,10 @@ export {
   archiveUnitOfMeasure,
 } from './modules/catalog/unitsOfMeasure';
 
+export {
+  upsertMasterProduct,
+  archiveProduct,
+  setProductStatus,
+} from './modules/catalog/products';
+
+

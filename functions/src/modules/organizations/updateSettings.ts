@@ -1,5 +1,5 @@
-import * as admin from 'firebase-admin';
 import type { CallableRequest } from 'firebase-functions/v2/https';
+import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '../../config/firebase';
 import { requireRole, requirePermission } from '../../middleware/auth';
 import { logAuditEvent } from '../../middleware/audit';
@@ -36,7 +36,7 @@ export async function updateFiscalYearHandler(request: CallableRequest): Promise
       );
     }
 
-    const now = admin.firestore.Timestamp.now();
+    const now = Timestamp.now();
     await orgRef.update({
       'fiscalYearSettings.type': input.fiscalYearType,
       updatedAt: now,
@@ -90,7 +90,7 @@ export async function updateHeldBillSettingsHandler(request: CallableRequest): P
       throw new NotFoundError('Organization not found');
     }
 
-    const now = admin.firestore.Timestamp.now();
+    const now = Timestamp.now();
     await orgRef.update({
       'heldBillSettings.expirationHours': input.expirationHours,
       updatedAt: now,

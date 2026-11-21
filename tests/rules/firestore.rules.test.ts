@@ -558,4 +558,48 @@ describe('Firestore Security Rules Comprehensive Security Audit Test Suite', () 
       })
     );
   });
+
+  // --- 8. Product Master Client Write & Read Protection ---
+  it('SEC-TC-PRODUCT-CLIENT-WRITE-FORBIDDEN: should strictly forbid direct client writes to products or variants', async () => {
+    // Setup active owner membership
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('userMemberships').doc('prod_owner_org_alpha').set({
+        userId: 'prod_owner_1',
+        organizationId: 'org_alpha',
+        role: 'OWNER',
+        status: 'ACTIVE',
+      });
+    });
+
+    const ownerContext = testEnv.authenticatedContext('prod_owner_1');
+    const db = ownerContext.firestore();
+
+    const productRef = db
+      .collection('organizations')
+      .doc('org_alpha')
+      .collection('products')
+      .doc('prod_direct_client_attempt');
+
+    // Direct client create attempt MUST fail
+    await assertFails(
+      productRef.set({
+        id: 'prod_direct_client_attempt',
+        organizationId: 'org_alpha',
+        name: 'Bypassing Cloud Function',
+        code: 'HACK-01',
+        categoryId: 'cat_1',
+        baseUomId: 'uom_pcs',
+        status: 'ACTIVE',
+      })
+    );
+
+    // Direct client variant create attempt MUST fail
+    const variantRef = productRef.collection('variants').doc('var_direct');
+    await assertFails(
+      variantRef.set({
+        id: 'var_direct',
+        sku: 'HACK-01-RED',
+      })
+    );
+  });
 });

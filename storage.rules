@@ -16,10 +16,20 @@ service firebase.storage {
       allow write: if isAuthenticated();
     }
 
-    // Organization scoped assets
-    match /organizations/{orgId}/{allPaths=**} {
-      allow read: if belongsToOrg(orgId);
-      allow write: if belongsToOrg(orgId);
+    // Organization scoped assets & product images
+    match /organizations/{orgId} {
+      match /products/{productId}/{imageFile} {
+        allow read: if belongsToOrg(orgId);
+        // Only valid images under 5MB allowed
+        allow write: if belongsToOrg(orgId) &&
+          request.resource.size < 5 * 1024 * 1024 &&
+          request.resource.contentType.matches('image/.*');
+      }
+
+      match /{allPaths=**} {
+        allow read: if belongsToOrg(orgId);
+        allow write: if belongsToOrg(orgId);
+      }
     }
   }
 }

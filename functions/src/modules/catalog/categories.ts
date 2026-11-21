@@ -129,9 +129,13 @@ export const upsertCategory = onCall(
         const now = firestore.Timestamp.now();
         const slug = `${slugify(input.name)}-${normalizedCode.toLowerCase()}`;
 
-        // Release old code registry entry if code changed
+        // Preserve old code registry entry as RESERVED_ARCHIVED if code changed (Never delete per audit policy)
         if (oldCodeRegistryRef) {
-          transaction.delete(oldCodeRegistryRef);
+          transaction.set(oldCodeRegistryRef, {
+            status: 'RESERVED_ARCHIVED',
+            supersededBy: normalizedCode,
+            updatedAt: now,
+          }, { merge: true });
         }
 
         // Write new code registry reservation
@@ -221,6 +225,21 @@ export const archiveCategory = onCall(
         if (!subcategoriesSnap.empty) {
           throw new ValidationError(
             'Cannot archive category with active subcategories. Archive or reassign subcategories first.'
+          );
+        }
+
+        // Check if existing products reference this category
+        const productsQuery = db
+          .collection('organizations')
+          .doc(organizationId)
+          .collection('products')
+          .where('categoryId', '==', categoryId)
+          .where('status', 'in', ['ACTIVE', 'INACTIVE']);
+        const productsSnap = await transaction.get(productsQuery);
+
+        if (!productsSnap.empty) {
+          throw new ValidationError(
+            'Cannot archive category because it is referenced by existing active or inactive products. Archive or reassign products first.'
           );
         }
 

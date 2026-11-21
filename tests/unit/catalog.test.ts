@@ -4,6 +4,7 @@ import {
   UpsertBrandInputSchema,
   UpsertUomInputSchema,
   UomConversionRuleSchema,
+  UpsertProductInputSchema,
   SafeIntegerMoneySchema,
   SYSTEM_DEFAULT_UOMS,
 } from '../../src/types/catalog';
@@ -260,6 +261,156 @@ describe('Phase 2 Master Data — Unit Test Suite', () => {
 
       expect(taxAmountMinor).toBe(3000); // exactly ₹30.00
       expect(grossAmountMinor).toBe(28000); // exactly ₹280.00
+    });
+  });
+
+  // ==========================================================================
+  // 6. PRODUCT MASTER SCHEMAS & PACKAGING CONVERSION SAFEGUARDS
+  // ==========================================================================
+  describe('Product Master Schema (UpsertProductInputSchema)', () => {
+    const validBaseProduct = {
+      organizationId: 'org_retail_1',
+      name: 'Basmati Rice Premium 5kg',
+      code: 'RICE-BAS-5KG',
+      description: 'Aged Himalayan long grain basmati rice',
+      categoryId: 'cat_groceries',
+      brandId: 'brand_daawat',
+      baseUomId: 'uom_pcs',
+      taxData: {
+        codeType: 'HSN' as const,
+        code: '1006',
+        taxCategory: 'STANDARD' as const,
+        taxSlabId: 'GST_5',
+        taxRatePercent: 5.0,
+        pricingType: 'TAX_INCLUSIVE' as const,
+      },
+      pricingPolicy: {
+        requiresMrp: true,
+        allowWholesale: true,
+      },
+      trackingFlags: {
+        trackBatches: true,
+        trackSerials: false,
+      },
+      images: [],
+      status: 'ACTIVE' as const,
+    };
+
+    it('should validate a complete valid product payload', () => {
+      const payload = {
+        ...validBaseProduct,
+        code: 'RICE-BAS-5KG',
+      };
+
+      const result = UpsertProductInputSchema.safeParse(payload);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.code).toBe('RICE-BAS-5KG');
+        expect(result.data.pricingPolicy.requiresMrp).toBe(true);
+        expect(result.data.trackingFlags.trackBatches).toBe(true);
+      }
+    });
+
+    it('should reject product code containing lowercase letters or illegal characters', () => {
+      const payload = {
+        ...validBaseProduct,
+        code: 'rice-bas-5kg', // Lowercase not allowed by NormalizedCodeSchema
+      };
+
+      const result = UpsertProductInputSchema.safeParse(payload);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.errors[0].message).toContain('uppercase alphanumeric characters');
+      }
+    });
+
+    it('should reject invalid product codes containing spaces or illegal characters', () => {
+      const payload = {
+        ...validBaseProduct,
+        code: 'INVALID CODE with spaces',
+      };
+
+      const result = UpsertProductInputSchema.safeParse(payload);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.errors[0].message).toContain('alphanumeric characters');
+      }
+    });
+
+    it('should reject product if secondaryUomId is identical to baseUomId', () => {
+      const payload = {
+        ...validBaseProduct,
+        baseUomId: 'uom_pcs',
+        secondaryUomId: 'uom_pcs', // Duplicate!
+        uomConversionFactor: 1,
+      };
+
+      const result = UpsertProductInputSchema.safeParse(payload);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.errors[0].message).toContain(
+          'Secondary unit cannot be identical to base unit'
+        );
+      }
+    });
+
+    it('should reject product if secondaryUomId is provided without positive conversion factor', () => {
+      const payload = {
+        ...validBaseProduct,
+        baseUomId: 'uom_pcs',
+        secondaryUomId: 'uom_box',
+        uomConversionFactor: 0, // Invalid factor!
+      };
+
+      const result = UpsertProductInputSchema.safeParse(payload);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.errors[0].message).toContain('positive');
+      }
+    });
+
+    it('should accept valid secondary packaging unit with positive conversion factor', () => {
+      const payload = {
+        ...validBaseProduct,
+        baseUomId: 'uom_pcs',
+        secondaryUomId: 'uom_box',
+        uomConversionFactor: 12, // 1 BOX = 12 PCS
+      };
+
+      const result = UpsertProductInputSchema.safeParse(payload);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.uomConversionFactor).toBe(12);
+      }
+    });
+
+    it('should validate HSN code (4 to 8 digits) and reject invalid HSN formats', () => {
+      const invalidHsnPayload = {
+        ...validBaseProduct,
+        taxData: {
+          ...validBaseProduct.taxData,
+          code: '12', // Too short (min 4 digits)
+        },
+      };
+
+      const result = UpsertProductInputSchema.safeParse(invalidHsnPayload);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.errors[0].message).toContain('4 to 8 numeric digits');
+      }
+    });
+
+    it('should reject tax rate percent outside 0-100 range', () => {
+      const invalidRatePayload = {
+        ...validBaseProduct,
+        taxData: {
+          ...validBaseProduct.taxData,
+          taxRatePercent: 125, // Invalid > 100
+        },
+      };
+
+      const result = UpsertProductInputSchema.safeParse(invalidRatePayload);
+      expect(result.success).toBe(false);
     });
   });
 });

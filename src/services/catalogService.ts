@@ -1,6 +1,7 @@
 import { httpsCallable } from 'firebase/functions';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db, functions } from '../config/firebase';
+import { collection, getDocs, getDoc, doc, query, orderBy } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, functions, storage } from '../config/firebase';
 import type {
   CategoryDocument,
   UpsertCategoryInput,
@@ -8,6 +9,9 @@ import type {
   UpsertBrandInput,
   UnitOfMeasureDocument,
   UpsertUomInput,
+  ProductDocument,
+  UpsertProductInput,
+  ProductImage,
 } from '../types/catalog';
 
 // ============================================================================
@@ -129,3 +133,96 @@ export async function archiveUnitOfMeasure(organizationId: string, uomId: string
   );
   await callArchive({ organizationId, uomId });
 }
+
+// ============================================================================
+// 4. PRODUCT MASTER SERVICE
+// ============================================================================
+
+export async function fetchProducts(
+  organizationId: string
+): Promise<ProductDocument[]> {
+  const productsRef = collection(db, 'organizations', organizationId, 'products');
+  const q = query(productsRef, orderBy('createdAt', 'desc'));
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data();
+    return {
+      ...data,
+      id: docSnap.id,
+      createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+      updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt,
+    } as ProductDocument;
+  });
+}
+
+export async function fetchProductById(
+  organizationId: string,
+  productId: string
+): Promise<ProductDocument | null> {
+  const productRef = doc(db, 'organizations', organizationId, 'products', productId);
+  const snapshot = await getDoc(productRef);
+  if (!snapshot.exists()) return null;
+
+  const data = snapshot.data();
+  return {
+    ...data,
+    id: snapshot.id,
+    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+    updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt,
+  } as ProductDocument;
+}
+
+export async function saveProduct(input: UpsertProductInput): Promise<{ productId: string }> {
+  const callUpsert = httpsCallable<UpsertProductInput, { success: boolean; productId: string }>(
+    functions,
+    'upsertMasterProduct'
+  );
+  const result = await callUpsert(input);
+  return { productId: result.data.productId };
+}
+
+export async function archiveProduct(organizationId: string, productId: string): Promise<void> {
+  const callArchive = httpsCallable<{ organizationId: string; productId: string }, { success: boolean }>(
+    functions,
+    'archiveProduct'
+  );
+  await callArchive({ organizationId, productId });
+}
+
+export async function setProductStatus(
+  organizationId: string,
+  productId: string,
+  status: 'ACTIVE' | 'INACTIVE'
+): Promise<void> {
+  const callSetStatus = httpsCallable<
+    { organizationId: string; productId: string; status: 'ACTIVE' | 'INACTIVE' },
+    { success: boolean }
+  >(functions, 'setProductStatus');
+  await callSetStatus({ organizationId, productId, status });
+}
+
+export async function uploadProductImage(
+  organizationId: string,
+  productId: string,
+  file: File,
+  isPrimary: boolean = false
+): Promise<ProductImage> {
+  const fileExt = file.name.split('.').pop() || 'jpg';
+  const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+  const storagePath = `organizations/${organizationId}/products/${productId}/${fileName}`;
+  const fileRef = ref(storage, storagePath);
+
+  await uploadBytes(fileRef, file, {
+    contentType: file.type,
+    customMetadata: { organizationId, productId },
+  });
+
+  const url = await getDownloadURL(fileRef);
+  return {
+    url,
+    storagePath,
+    isPrimary,
+  };
+}
+

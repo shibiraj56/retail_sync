@@ -197,7 +197,139 @@ export const UpsertBrandInputSchema = z.object({
 export type UpsertBrandInput = z.infer<typeof UpsertBrandInputSchema>;
 
 // ============================================================================
-// 6. SYSTEM DEFAULT UNITS SEED SPECIFICATION
+// 6. PRODUCT MASTER SCHEMAS
+// ============================================================================
+
+export type ProductStatus = 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
+export const ProductStatusSchema = z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED']);
+
+export interface ProductImage {
+  url: string;
+  isPrimary: boolean;
+  storagePath: string;
+}
+
+export const ProductImageSchema = z.object({
+  url: z.string().url('Invalid image URL'),
+  isPrimary: z.boolean().default(false),
+  storagePath: z.string().min(1, 'Storage path is required'),
+});
+
+export interface ProductDocument {
+  id: string;
+  organizationId: string;
+  name: string;
+  code: string; // Unique within organization
+  slug: string;
+  description?: string;
+  categoryId: string;
+  categorySnapshot: {
+    name: string;
+    code: string;
+  };
+  brandId?: string | null;
+  brandSnapshot?: {
+    name: string;
+    code: string;
+  } | null;
+  baseUomId: string;
+  baseUomSnapshot: {
+    name: string;
+    symbol: string;
+    allowDecimals: boolean;
+    decimalPrecision: number;
+  };
+  secondaryUomId?: string | null;
+  secondaryUomSnapshot?: {
+    name: string;
+    symbol: string;
+    allowDecimals: boolean;
+    decimalPrecision: number;
+  } | null;
+  uomConversionFactor?: number | null; // 1 Secondary = factor * Base
+  hasVariants: boolean;
+  taxData: {
+    codeType: 'HSN' | 'SAC';
+    code: string;
+    taxCategory: 'STANDARD' | 'EXEMPT' | 'ZERO_RATED';
+    taxSlabId: string;
+    taxRatePercent: number;
+    pricingType: 'TAX_INCLUSIVE' | 'TAX_EXCLUSIVE';
+  };
+  pricingPolicy: {
+    requiresMrp: boolean;
+    allowWholesale: boolean;
+  };
+  trackingFlags: {
+    trackBatches: boolean;
+    trackSerials: boolean;
+  };
+  images: ProductImage[];
+  status: ProductStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const UpsertProductInputSchema = z
+  .object({
+    organizationId: z.string().min(1, 'Organization ID is required'),
+    id: z.string().optional(),
+    name: z.string().trim().min(1, 'Product name is required').max(200),
+    code: NormalizedCodeSchema,
+    description: z.string().max(2000).optional(),
+    categoryId: z.string().min(1, 'Category is required'),
+    brandId: z.string().nullable().optional(),
+    baseUomId: z.string().min(1, 'Base unit of measure is required'),
+    secondaryUomId: z.string().nullable().optional(),
+    uomConversionFactor: z.number().positive('Conversion factor must be positive').nullable().optional(),
+    taxData: z.object({
+      codeType: z.enum(['HSN', 'SAC']),
+      code: HsnSacCodeSchema,
+      taxCategory: z.enum(['STANDARD', 'EXEMPT', 'ZERO_RATED']).default('STANDARD'),
+      taxSlabId: z.string().min(1, 'Tax slab ID is required'),
+      taxRatePercent: z.number().min(0).max(100),
+      pricingType: z.enum(['TAX_INCLUSIVE', 'TAX_EXCLUSIVE']).default('TAX_INCLUSIVE'),
+    }),
+    pricingPolicy: z.object({
+      requiresMrp: z.boolean().default(true),
+      allowWholesale: z.boolean().default(false),
+    }),
+    trackingFlags: z.object({
+      trackBatches: z.boolean().default(false),
+      trackSerials: z.boolean().default(false),
+    }),
+    images: z.array(ProductImageSchema).default([]),
+    status: ProductStatusSchema.default('ACTIVE'),
+  })
+  .refine(
+    (data) => {
+      if (data.secondaryUomId && data.secondaryUomId === data.baseUomId) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: 'Secondary unit cannot be identical to base unit',
+      path: ['secondaryUomId'],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.secondaryUomId && (!data.uomConversionFactor || data.uomConversionFactor <= 0)) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: 'Conversion factor is required when secondary unit is configured',
+      path: ['uomConversionFactor'],
+    }
+  );
+
+export type UpsertProductInput = z.infer<typeof UpsertProductInputSchema>;
+
+// ============================================================================
+// 7. SYSTEM DEFAULT UNITS SEED SPECIFICATION
 // ============================================================================
 
 export const SYSTEM_DEFAULT_UOMS: Array<Omit<UnitOfMeasureDocument, 'organizationId' | 'createdAt' | 'updatedAt'>> = [

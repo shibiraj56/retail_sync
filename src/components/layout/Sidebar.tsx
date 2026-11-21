@@ -9,6 +9,7 @@ import {
   FolderTree,
   Tag,
   Scale,
+  Package,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { StoreSwitcher } from './StoreSwitcher';
@@ -42,6 +43,11 @@ export const Sidebar: React.FC = () => {
   ];
 
   const catalogLinks = [
+    {
+      to: '/catalog/products',
+      label: 'Products',
+      icon: <Package className="w-4 h-4" />,
+    },
     {
       to: '/catalog/categories',
       label: 'Categories',

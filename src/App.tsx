@@ -41,6 +41,15 @@ const BrandListPage = lazy(() =>
 const UomListPage = lazy(() =>
   import('./modules/catalog/UomListPage').then((m) => ({ default: m.UomListPage }))
 );
+const ProductListPage = lazy(() =>
+  import('./modules/catalog/ProductListPage').then((m) => ({ default: m.ProductListPage }))
+);
+const ProductCreateWizard = lazy(() =>
+  import('./modules/catalog/ProductCreateWizard').then((m) => ({ default: m.ProductCreateWizard }))
+);
+const ProductDetailsPage = lazy(() =>
+  import('./modules/catalog/ProductDetailsPage').then((m) => ({ default: m.ProductDetailsPage }))
+);
 
 const PageLoadingFallback: React.FC = () => (
   <div className="flex h-64 items-center justify-center">
@@ -78,6 +87,10 @@ export const App: React.FC = () => {
                 <Route path="/team" element={<TeamMembersPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 {/* Phase 2 Master Data Routes */}
+                <Route path="/catalog/products" element={<ProductListPage />} />
+                <Route path="/catalog/products/new" element={<ProductCreateWizard />} />
+                <Route path="/catalog/products/:productId" element={<ProductDetailsPage />} />
+                <Route path="/catalog/products/:productId/edit" element={<ProductCreateWizard />} />
                 <Route path="/catalog/categories" element={<CategoryListPage />} />
                 <Route path="/catalog/brands" element={<BrandListPage />} />
                 <Route path="/catalog/uom" element={<UomListPage />} />

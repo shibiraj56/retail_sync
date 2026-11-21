@@ -76,8 +76,13 @@ export const upsertBrand = onCall(
         // --- 2. ALL WRITES AFTER READS ---
         const now = firestore.Timestamp.now();
 
+        // Preserve old code registry entry as RESERVED_ARCHIVED if code changed (Never delete per audit policy)
         if (oldCodeRegistryRef) {
-          transaction.delete(oldCodeRegistryRef);
+          transaction.set(oldCodeRegistryRef, {
+            status: 'RESERVED_ARCHIVED',
+            supersededBy: normalizedCode,
+            updatedAt: now,
+          }, { merge: true });
         }
 
         transaction.set(codeRegistryRef, {
@@ -145,6 +150,21 @@ export const archiveBrand = onCall(
         const brandData = brandDoc.data();
         if (!brandData) {
           throw new NotFoundError('Brand data is empty');
+        }
+
+        // Check if existing products reference this brand
+        const productsQuery = db
+          .collection('organizations')
+          .doc(organizationId)
+          .collection('products')
+          .where('brandId', '==', brandId)
+          .where('status', 'in', ['ACTIVE', 'INACTIVE']);
+        const productsSnap = await transaction.get(productsQuery);
+
+        if (!productsSnap.empty) {
+          throw new ValidationError(
+            'Cannot archive brand because it is referenced by existing active or inactive products. Archive or reassign products first.'
+          );
         }
 
         const now = firestore.Timestamp.now();

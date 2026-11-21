@@ -1,4 +1,4 @@
-import * as admin from 'firebase-admin';
+import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '../../config/firebase';
 import type { UserProfileDocument } from '../../shared/types';
 
@@ -11,7 +11,7 @@ export async function syncUserProfile(
   const userRef = db.collection('users').doc(userId);
   const userSnap = await userRef.get();
 
-  const now = admin.firestore.Timestamp.now();
+  const now = Timestamp.now();
 
   if (!userSnap.exists) {
     const newProfile: UserProfileDocument = {
