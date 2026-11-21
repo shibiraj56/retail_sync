@@ -131,7 +131,7 @@ export const UpsertVariantItemSchema = z
 export type UpsertVariantItem = z.infer<typeof UpsertVariantItemSchema>;
 
 // ============================================================================
-// 4. SYNCHRONOUS TRANSACTION INPUT (BOUNDED <= 50 VARIANTS)
+// 4. SYNCHRONOUS TRANSACTION INPUT (BOUNDED <= 25 VARIANTS)
 // ============================================================================
 
 export const SaveVariantsSyncInputSchema = z
@@ -142,7 +142,10 @@ export const SaveVariantsSyncInputSchema = z
     variants: z
       .array(UpsertVariantItemSchema)
       .min(1, 'At least one variant must be provided')
-      .max(50, 'Synchronous processing is strictly bounded to 50 variants per transaction. Use staged background jobs for larger matrices.'),
+      .max(
+        25,
+        'Synchronous processing is strictly bounded to 25 variants per transaction to guarantee compliance with Firestore 500-write limits under maximum identifier replacement overhead (25 variants * 15 writes = 375 writes). Use staged background jobs for larger matrices.'
+      ),
   })
   .refine(
     (data) => {

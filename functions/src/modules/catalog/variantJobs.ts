@@ -98,8 +98,10 @@ export const createVariantMatrixJob = onCall(
       const totalChunks = Math.ceil(plannedVariants.length / CHUNK_SIZE);
       const jobsColRef = db.collection('organizations').doc(organizationId).collection('variantJobs');
       const jobId = jobsColRef.doc().id;
+      const jobRef = jobsColRef.doc(jobId);
       const now = firestore.Timestamp.now();
 
+      // Root job document stores ONLY metadata to strictly prevent exceeding Firestore's 1 MiB limit
       const jobData = {
         id: jobId,
         organizationId,
@@ -116,12 +118,27 @@ export const createVariantMatrixJob = onCall(
         leaseWorkerId: null,
         leaseExpiresAt: null,
         errors: [],
-        plannedVariants,
         createdAt: now,
         updatedAt: now,
       };
 
-      await jobsColRef.doc(jobId).set(jobData);
+      // Atomic batch write for job document + bounded chunk sub-documents (25 variants per chunk)
+      const batch = db.batch();
+      batch.set(jobRef, jobData);
+
+      for (let c = 0; c < totalChunks; c++) {
+        const chunkDocRef = jobRef.collection('chunks').doc(String(c));
+        const chunkSlice = plannedVariants.slice(c * CHUNK_SIZE, (c + 1) * CHUNK_SIZE);
+        batch.set(chunkDocRef, {
+          id: String(c),
+          jobId,
+          chunkIndex: c,
+          items: chunkSlice,
+          createdAt: now,
+        });
+      }
+
+      await batch.commit();
 
       return {
         success: true,
@@ -130,7 +147,7 @@ export const createVariantMatrixJob = onCall(
         totalChunks,
         chunkSize: CHUNK_SIZE,
         fencingToken: 1,
-        message: `Staged variant job '${jobId}' initialized with ${totalChunks} chunks`,
+        message: `Staged variant job '${jobId}' initialized with ${totalChunks} chunks in subcollection`,
       };
     } catch (error) {
       handleFunctionError(error);
@@ -276,11 +293,29 @@ export const processVariantMatrixJobChunk = onCall(
         }
 
         const currentChunk = jobData.currentChunkIndex;
-        const chunkSize = jobData.chunkSize || CHUNK_SIZE;
-        const startIndex = currentChunk * chunkSize;
-        const endIndex = Math.min(startIndex + chunkSize, jobData.totalCombinations);
+        if (currentChunk >= jobData.totalChunks) {
+          transaction.update(jobRef, {
+            status: 'COMPLETED',
+            updatedAt: firestore.Timestamp.now(),
+          });
+          return { status: 'COMPLETED', currentChunkIndex: currentChunk, totalChunks: jobData.totalChunks };
+        }
 
-        const chunkItems: any[] = jobData.plannedVariants.slice(startIndex, endIndex);
+        // Read bounded chunk document from subcollection (Transaction Read Phase)
+        const chunkDocRef = jobRef.collection('chunks').doc(String(currentChunk));
+        const chunkDoc = await transaction.get(chunkDocRef);
+
+        let chunkItems: any[] = [];
+        if (chunkDoc.exists) {
+          chunkItems = chunkDoc.data()?.items || [];
+        } else if (Array.isArray(jobData.plannedVariants)) {
+          // Backward-compatibility fallback for legacy single-document jobs
+          const chunkSize = jobData.chunkSize || CHUNK_SIZE;
+          const startIndex = currentChunk * chunkSize;
+          const endIndex = Math.min(startIndex + chunkSize, jobData.totalCombinations);
+          chunkItems = jobData.plannedVariants.slice(startIndex, endIndex);
+        }
+
         if (chunkItems.length === 0) {
           // Completed
           transaction.update(jobRef, {
@@ -320,6 +355,7 @@ export const processVariantMatrixJobChunk = onCall(
         const errorsToAdd: any[] = [];
         let chunkProcessed = 0;
         let chunkFailed = 0;
+        const startIndex = currentChunk * (jobData.chunkSize || CHUNK_SIZE);
 
         for (let i = 0; i < chunkItems.length; i++) {
           const item = chunkItems[i];

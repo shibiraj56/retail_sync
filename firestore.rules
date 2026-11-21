@@ -171,6 +171,11 @@ service cloud.firestore {
       match /variantJobs/{jobId} {
         allow read: if hasActiveMembership(orgId);
         allow write: if false;
+
+        match /chunks/{chunkId} {
+          allow read: if hasActiveMembership(orgId);
+          allow write: if false;
+        }
       }
 
       // --- Supplier Directory (Mutated solely via Cloud Functions) ---

@@ -150,8 +150,8 @@ export const VariantMatrixManager: React.FC<VariantMatrixManagerProps> = ({
   // Synchronous Save Mutation
   const saveSyncMutation = useMutation({
     mutationFn: () => {
-      if (previewItems.length > 50) {
-        throw new Error('Matrix exceeds 50 variants. Use staged background processing.');
+      if (previewItems.length > 25) {
+        throw new Error('Matrix exceeds 25 variants. Use staged background processing.');
       }
       return saveVariantsSync({
         organizationId,
@@ -682,7 +682,7 @@ export const VariantMatrixManager: React.FC<VariantMatrixManagerProps> = ({
               </div>
 
               <div className="flex items-center gap-3">
-                {previewItems.length <= 50 ? (
+                {previewItems.length <= 25 ? (
                   <Button
                     variant="primary"
                     size="sm"
