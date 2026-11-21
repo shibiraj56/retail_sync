@@ -6,31 +6,43 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    function belongsToOrg(orgId) {
-      return isAuthenticated() && request.auth.token.orgId == orgId;
+    // Authoritative Firestore active membership check:
+    // Validates that the caller holds an authoritative ACTIVE membership document in Firestore.
+    // Stale JWT custom claims alone are NEVER trusted.
+    function hasActiveMembership(orgId) {
+      return isAuthenticated() && checkActiveMembership(orgId);
     }
 
-    // Public catalog images
+    function checkActiveMembership(orgId) {
+      let membershipId = request.auth.uid + '_' + orgId;
+      return firestore.exists(/databases/(default)/documents/userMemberships/$(membershipId)) &&
+        firestore.get(/databases/(default)/documents/userMemberships/$(membershipId)).data.status == 'ACTIVE';
+    }
+
+    // Public catalog assets (read-only)
     match /public/{allPaths=**} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow write: if false;
     }
 
     // Organization scoped assets & product images
     match /organizations/{orgId} {
       match /products/{productId}/{imageFile} {
-        allow read: if belongsToOrg(orgId);
-        // Only valid images under 5MB allowed on creation and updates
-        allow create, update: if belongsToOrg(orgId) &&
+        // Read: authorized active organization members only
+        allow read: if hasActiveMembership(orgId);
+
+        // Upload & Update: authorized active organization members, valid image MIME, max 5MB
+        allow create, update: if hasActiveMembership(orgId) &&
           request.resource.size < 5 * 1024 * 1024 &&
           request.resource.contentType.matches('image/.*');
-        // Deletion permitted for organization members
-        allow delete: if belongsToOrg(orgId);
+
+        // Delete: authorized active organization members only
+        allow delete: if hasActiveMembership(orgId);
       }
 
       match /{allPaths=**} {
-        allow read: if belongsToOrg(orgId);
-        allow write: if belongsToOrg(orgId);
+        allow read: if hasActiveMembership(orgId);
+        allow write: if false;
       }
     }
   }

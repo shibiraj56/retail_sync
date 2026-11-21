@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint src",
     "test": "vitest run tests/unit",
-    "test:rules": "vitest run tests/rules",
+    "test:rules": "vitest run tests/rules --fileParallelism=false",
     "test:all": "vitest run",
     "emulators": "firebase emulators:start --only auth,firestore,functions,storage",
     "emulators:export": "firebase emulators:export ./firebase-export",
