@@ -14,7 +14,7 @@
 | **Day 1** | Architecture Baseline & Verification | Nov 20 | **COMPLETE** | Workspace audited, 11 corrections verified, baseline build passing. |
 | **Day 2** | Categories, Brands & Units of Measure (UoM) | Nov 21 | **COMPLETE** | Cloud Functions v2, codeRegistry uniqueness, 2-level hierarchy, 7 standard UoMs, UI screens, 14 rules tests, 38 unit tests. |
 | **Day 3** | Product Master Core (CRUD & Lifecycle) | Nov 22 | **COMPLETE** | Preflight fixes, product schema, codeRegistry PRODUCT_{CODE}, UoM compatibility, snapshots, storage rules, 3 UI screens, 46 unit tests, 15 rules tests. |
-| **Day 4** | Matrix Variants & Identifier Registries | Nov 23 | *Upcoming* | Size x Color x Style matrix, deterministic IDs, SKU/barcode registries. |
+| **Day 4** | Matrix Variants & Identifier Registries | Nov 23 | **COMPLETE** | 1-3 axis matrix, deterministic variant IDs, SKU/barcode registries, cross-format barcode validation, bounded sync + staged background jobs, 75 unit tests. |
 | **Day 5** | Pricing Hierarchy & Tax Configuration | Nov 24 | *Upcoming* | Integer minor units, GST slabs, HSN/SAC, currency configuration. |
 | **Day 6** | Supplier & Customer Master Directories | Nov 25 | *Upcoming* | Supplier profiles, cashier customer allowlist, duplicate phone search. |
 | **Day 7** | E2E Integration, Emulators & Hardening | Nov 26 | *Upcoming* | Full multi-vertical test suite, performance audit, defect resolution. |

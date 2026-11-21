@@ -167,6 +167,12 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // --- Background Variant Generation Jobs (Mutated solely via Cloud Functions) ---
+      match /variantJobs/{jobId} {
+        allow read: if hasActiveMembership(orgId);
+        allow write: if false;
+      }
+
       // --- Supplier Directory (Mutated solely via Cloud Functions) ---
       match /suppliers/{supplierId} {
         allow read: if hasActiveMembership(orgId);

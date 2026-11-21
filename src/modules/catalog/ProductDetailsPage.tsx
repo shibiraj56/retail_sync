@@ -27,6 +27,7 @@ import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
+import { VariantMatrixManager } from './components/VariantMatrixManager';
 
 export function ProductDetailsPage(): JSX.Element {
   const { productId } = useParams<{ productId: string }>();
@@ -39,6 +40,7 @@ export function ProductDetailsPage(): JSX.Element {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [mainTab, setMainTab] = useState<'overview' | 'variants'>('overview');
 
   const { data: product, isLoading } = useQuery({
     queryKey: ['product', orgId, productId],
@@ -184,8 +186,36 @@ export function ProductDetailsPage(): JSX.Element {
         </div>
       </div>
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Navigation Tabs */}
+      <div className="flex border-b border-slate-200 gap-2">
+        <button
+          type="button"
+          onClick={() => setMainTab('overview')}
+          className={`py-2 px-4 text-xs font-semibold border-b-2 transition-colors ${
+            mainTab === 'overview'
+              ? 'border-brand-600 text-brand-600'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          Product Overview & Specifications
+        </button>
+        <button
+          type="button"
+          onClick={() => setMainTab('variants')}
+          className={`py-2 px-4 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${
+            mainTab === 'variants'
+              ? 'border-brand-600 text-brand-600'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          Matrix Variants & Identifiers
+        </button>
+      </div>
+
+      {mainTab === 'overview' ? (
+        /* Main Grid */
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Left Column: Image Showcase */}
         <div className="md:col-span-1 space-y-4">
           <Card className="p-4 space-y-3">
@@ -432,6 +462,11 @@ export function ProductDetailsPage(): JSX.Element {
           </Card>
         </div>
       </div>
+      ) : (
+        <Card className="p-6">
+          <VariantMatrixManager organizationId={orgId} product={product} />
+        </Card>
+      )}
 
       {/* Archive Modal */}
       {isArchiveModalOpen && (

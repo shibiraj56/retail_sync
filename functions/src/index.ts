@@ -85,4 +85,20 @@ export {
   setProductStatus,
 } from './modules/catalog/products';
 
+export {
+  generateVariantMatrix,
+  saveProductVariantsSync,
+  upsertSingleVariant,
+  archiveVariant,
+  validateIdentifier,
+} from './modules/catalog/variants';
+
+export {
+  createVariantMatrixJob,
+  acquireJobLease,
+  processVariantMatrixJobChunk,
+  getVariantMatrixJobStatus,
+} from './modules/catalog/variantJobs';
+
+
 

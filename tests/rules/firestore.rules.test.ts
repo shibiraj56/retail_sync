@@ -602,4 +602,167 @@ describe('Firestore Security Rules Comprehensive Security Audit Test Suite', () 
       })
     );
   });
+
+  // --- 9. Day 4: Variant Registries & Background Jobs Security ---
+  it('SEC-TC-REGISTRY-CLIENT-WRITE-FORBIDDEN: should strictly forbid direct client writes to skuRegistry, barcodeRegistry, and variantJobs', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('userMemberships').doc('reg_owner_org_alpha').set({
+        userId: 'reg_owner_1',
+        organizationId: 'org_alpha',
+        role: 'OWNER',
+        status: 'ACTIVE',
+      });
+    });
+
+    const ownerContext = testEnv.authenticatedContext('reg_owner_1');
+    const db = ownerContext.firestore();
+
+    // 1. Direct write to skuRegistry MUST fail
+    const skuRef = db.collection('organizations').doc('org_alpha').collection('skuRegistry').doc('SKU-MALICIOUS');
+    await assertFails(
+      skuRef.set({
+        id: 'SKU-MALICIOUS',
+        sku: 'SKU-MALICIOUS',
+        status: 'ACTIVE',
+      })
+    );
+
+    // 2. Direct write to barcodeRegistry MUST fail
+    const bcRef = db.collection('organizations').doc('org_alpha').collection('barcodeRegistry').doc('8901030383457');
+    await assertFails(
+      bcRef.set({
+        id: '8901030383457',
+        barcode: '8901030383457',
+        status: 'ACTIVE',
+      })
+    );
+
+    // 3. Direct write to variantJobs MUST fail
+    const jobRef = db.collection('organizations').doc('org_alpha').collection('variantJobs').doc('job_hacked');
+    await assertFails(
+      jobRef.set({
+        id: 'job_hacked',
+        status: 'COMPLETED',
+      })
+    );
+  });
+
+  it('SEC-TC-REGISTRY-TENANT-ISOLATION: should enforce cross-tenant and suspended member isolation for variants and registries', async () => {
+    // Seed test data with rules disabled
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+
+      // Seed active membership for Alpha
+      await adminDb.collection('userMemberships').doc('alpha_member_org_alpha').set({
+        userId: 'alpha_member',
+        organizationId: 'org_alpha',
+        role: 'MANAGER',
+        status: 'ACTIVE',
+      });
+
+      // Seed active membership for Beta
+      await adminDb.collection('userMemberships').doc('beta_member_org_beta').set({
+        userId: 'beta_member',
+        organizationId: 'org_beta',
+        role: 'OWNER',
+        status: 'ACTIVE',
+      });
+
+      // Seed suspended membership in Alpha
+      await adminDb.collection('userMemberships').doc('suspended_alpha_org_alpha').set({
+        userId: 'suspended_alpha',
+        organizationId: 'org_alpha',
+        role: 'MANAGER',
+        status: 'SUSPENDED',
+      });
+
+      // Seed variant document
+      await adminDb
+        .collection('organizations')
+        .doc('org_alpha')
+        .collection('products')
+        .doc('prod_100')
+        .collection('variants')
+        .doc('var_100_s')
+        .set({
+          id: 'var_100_s',
+          sku: 'SHIRT-S',
+          barcode: '8901030383457',
+          status: 'ACTIVE',
+        });
+
+      // Seed SKU registry entry
+      await adminDb
+        .collection('organizations')
+        .doc('org_alpha')
+        .collection('skuRegistry')
+        .doc('SHIRT-S')
+        .set({
+          id: 'SHIRT-S',
+          status: 'ACTIVE',
+        });
+
+      // Seed Barcode registry entry
+      await adminDb
+        .collection('organizations')
+        .doc('org_alpha')
+        .collection('barcodeRegistry')
+        .doc('8901030383457')
+        .set({
+          id: '8901030383457',
+          status: 'ACTIVE',
+        });
+    });
+
+    const alphaContext = testEnv.authenticatedContext('alpha_member');
+    const betaContext = testEnv.authenticatedContext('beta_member');
+    const suspendedContext = testEnv.authenticatedContext('suspended_alpha');
+
+    const alphaVariantRef = alphaContext.firestore()
+      .collection('organizations')
+      .doc('org_alpha')
+      .collection('products')
+      .doc('prod_100')
+      .collection('variants')
+      .doc('var_100_s');
+
+    const alphaSkuRef = alphaContext.firestore()
+      .collection('organizations')
+      .doc('org_alpha')
+      .collection('skuRegistry')
+      .doc('SHIRT-S');
+
+    // 1. Active Alpha member CAN read variants and registry in Org Alpha
+    await assertSucceeds(alphaVariantRef.get());
+    await assertSucceeds(alphaSkuRef.get());
+
+    // 2. Beta member CANNOT read variants or registry in Org Alpha (cross-tenant rejected)
+    const betaAttemptVariant = betaContext.firestore()
+      .collection('organizations')
+      .doc('org_alpha')
+      .collection('products')
+      .doc('prod_100')
+      .collection('variants')
+      .doc('var_100_s');
+
+    const betaAttemptSku = betaContext.firestore()
+      .collection('organizations')
+      .doc('org_alpha')
+      .collection('skuRegistry')
+      .doc('SHIRT-S');
+
+    await assertFails(betaAttemptVariant.get());
+    await assertFails(betaAttemptSku.get());
+
+    // 3. Suspended member CANNOT read variants or registry in Org Alpha
+    const suspendedAttemptVariant = suspendedContext.firestore()
+      .collection('organizations')
+      .doc('org_alpha')
+      .collection('products')
+      .doc('prod_100')
+      .collection('variants')
+      .doc('var_100_s');
+
+    await assertFails(suspendedAttemptVariant.get());
+  });
 });
