@@ -178,6 +178,22 @@ service cloud.firestore {
         }
       }
 
+      // --- Pricing Hierarchy & Tax Configurations (Mutated solely via Cloud Functions) ---
+      match /taxConfigurations/{id} {
+        allow read: if hasActiveMembership(orgId);
+        allow write: if false;
+      }
+
+      match /pricingRules/{id} {
+        allow read: if hasActiveMembership(orgId);
+        allow write: if false;
+      }
+
+      match /pricingHistory/{id} {
+        allow read: if hasActiveMembership(orgId);
+        allow write: if false;
+      }
+
       // --- Supplier Directory (Mutated solely via Cloud Functions) ---
       match /suppliers/{supplierId} {
         allow read: if hasActiveMembership(orgId);

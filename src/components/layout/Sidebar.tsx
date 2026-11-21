@@ -10,6 +10,7 @@ import {
   Tag,
   Scale,
   Package,
+  Receipt,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { StoreSwitcher } from './StoreSwitcher';
@@ -62,6 +63,11 @@ export const Sidebar: React.FC = () => {
       to: '/catalog/uom',
       label: 'Units of Measure',
       icon: <Scale className="w-4 h-4" />,
+    },
+    {
+      to: '/catalog/pricing',
+      label: 'Pricing & Tax',
+      icon: <Receipt className="w-4 h-4" />,
     },
   ];
 

@@ -765,4 +765,218 @@ describe('Firestore Security Rules Comprehensive Security Audit Test Suite', () 
 
     await assertFails(suspendedAttemptVariant.get());
   });
+
+  // --- 11. Day 5: Tax Configurations, Pricing Rules, & Pricing History Security ---
+  it('SEC-TC-PRICING-01: Direct client writes to taxConfigurations, pricingRules, and pricingHistory must be strictly denied', async () => {
+    // Setup org and active owner
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      await adminDb.collection('organizations').doc('org_pricing').set({
+        name: 'Pricing Org',
+        status: 'ACTIVE',
+      });
+      await adminDb
+        .collection('userMemberships')
+        .doc('owner_user_org_pricing')
+        .set({
+          userId: 'owner_user',
+          organizationId: 'org_pricing',
+          role: 'OWNER',
+          status: 'ACTIVE',
+        });
+    });
+
+    const ownerContext = testEnv.authenticatedContext('owner_user');
+    const db = ownerContext.firestore();
+
+    const taxRef = db
+      .collection('organizations')
+      .doc('org_pricing')
+      .collection('taxConfigurations')
+      .doc('tax_gst_18');
+
+    const ruleRef = db
+      .collection('organizations')
+      .doc('org_pricing')
+      .collection('pricingRules')
+      .doc('rule_store_1');
+
+    const historyRef = db
+      .collection('organizations')
+      .doc('org_pricing')
+      .collection('pricingHistory')
+      .doc('hist_1');
+
+    // Attempt direct writes from client - all must fail even for OWNER
+    await assertFails(
+      taxRef.set({
+        name: 'GST 18%',
+        ratePercent: 18,
+        status: 'ACTIVE',
+      })
+    );
+
+    await assertFails(
+      ruleRef.set({
+        level: 'STORE',
+        priceMinor: 9900,
+        status: 'ACTIVE',
+      })
+    );
+
+    await assertFails(
+      historyRef.set({
+        oldPriceMinor: 10000,
+        newPriceMinor: 9900,
+      })
+    );
+  });
+
+  it('SEC-TC-PRICING-02: Active organization members can read pricing and tax collections, while cross-tenant and suspended members are blocked', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      await adminDb.collection('organizations').doc('org_pricing_a').set({
+        name: 'Pricing Org A',
+        status: 'ACTIVE',
+      });
+      await adminDb.collection('organizations').doc('org_pricing_b').set({
+        name: 'Pricing Org B',
+        status: 'ACTIVE',
+      });
+
+      // Active member in Org A
+      await adminDb
+        .collection('userMemberships')
+        .doc('cashier_a_org_pricing_a')
+        .set({
+          userId: 'cashier_a',
+          organizationId: 'org_pricing_a',
+          role: 'CASHIER',
+          status: 'ACTIVE',
+        });
+
+      // Suspended member in Org A
+      await adminDb
+        .collection('userMemberships')
+        .doc('suspended_a_org_pricing_a')
+        .set({
+          userId: 'suspended_a',
+          organizationId: 'org_pricing_a',
+          role: 'CASHIER',
+          status: 'SUSPENDED',
+        });
+
+      // Active member in Org B
+      await adminDb
+        .collection('userMemberships')
+        .doc('member_b_org_pricing_b')
+        .set({
+          userId: 'member_b',
+          organizationId: 'org_pricing_b',
+          role: 'MANAGER',
+          status: 'ACTIVE',
+        });
+
+      // Seed documents in Org A
+      await adminDb
+        .collection('organizations')
+        .doc('org_pricing_a')
+        .collection('taxConfigurations')
+        .doc('tax_18')
+        .set({
+          name: 'GST 18%',
+          ratePercent: 18,
+          status: 'ACTIVE',
+        });
+
+      await adminDb
+        .collection('organizations')
+        .doc('org_pricing_a')
+        .collection('pricingRules')
+        .doc('rule_1')
+        .set({
+          level: 'STORE',
+          priceMinor: 5000,
+          status: 'ACTIVE',
+        });
+
+      await adminDb
+        .collection('organizations')
+        .doc('org_pricing_a')
+        .collection('pricingHistory')
+        .doc('hist_1')
+        .set({
+          newPriceMinor: 5000,
+        });
+    });
+
+    const cashierAContext = testEnv.authenticatedContext('cashier_a');
+    const memberBContext = testEnv.authenticatedContext('member_b');
+    const suspendedAContext = testEnv.authenticatedContext('suspended_a');
+    const anonContext = testEnv.unauthenticatedContext();
+
+    const taxDocRefA = cashierAContext
+      .firestore()
+      .collection('organizations')
+      .doc('org_pricing_a')
+      .collection('taxConfigurations')
+      .doc('tax_18');
+
+    const ruleDocRefA = cashierAContext
+      .firestore()
+      .collection('organizations')
+      .doc('org_pricing_a')
+      .collection('pricingRules')
+      .doc('rule_1');
+
+    const histDocRefA = cashierAContext
+      .firestore()
+      .collection('organizations')
+      .doc('org_pricing_a')
+      .collection('pricingHistory')
+      .doc('hist_1');
+
+    // 1. Active member in Org A can read Org A documents
+    await assertSucceeds(taxDocRefA.get());
+    await assertSucceeds(ruleDocRefA.get());
+    await assertSucceeds(histDocRefA.get());
+
+    // 2. Member of Org B cannot read Org A documents (cross-tenant rejected)
+    const crossTenantTaxRef = memberBContext
+      .firestore()
+      .collection('organizations')
+      .doc('org_pricing_a')
+      .collection('taxConfigurations')
+      .doc('tax_18');
+
+    const crossTenantRuleRef = memberBContext
+      .firestore()
+      .collection('organizations')
+      .doc('org_pricing_a')
+      .collection('pricingRules')
+      .doc('rule_1');
+
+    await assertFails(crossTenantTaxRef.get());
+    await assertFails(crossTenantRuleRef.get());
+
+    // 3. Suspended member in Org A cannot read Org A documents
+    const suspendedTaxRef = suspendedAContext
+      .firestore()
+      .collection('organizations')
+      .doc('org_pricing_a')
+      .collection('taxConfigurations')
+      .doc('tax_18');
+
+    await assertFails(suspendedTaxRef.get());
+
+    // 4. Unauthenticated user cannot read
+    const anonTaxRef = anonContext
+      .firestore()
+      .collection('organizations')
+      .doc('org_pricing_a')
+      .collection('taxConfigurations')
+      .doc('tax_18');
+
+    await assertFails(anonTaxRef.get());
+  });
 });

@@ -50,6 +50,9 @@ const ProductCreateWizard = lazy(() =>
 const ProductDetailsPage = lazy(() =>
   import('./modules/catalog/ProductDetailsPage').then((m) => ({ default: m.ProductDetailsPage }))
 );
+const PricingManagementPage = lazy(() =>
+  import('./modules/catalog/PricingManagementPage').then((m) => ({ default: m.PricingManagementPage }))
+);
 
 const PageLoadingFallback: React.FC = () => (
   <div className="flex h-64 items-center justify-center">
@@ -94,6 +97,7 @@ export const App: React.FC = () => {
                 <Route path="/catalog/categories" element={<CategoryListPage />} />
                 <Route path="/catalog/brands" element={<BrandListPage />} />
                 <Route path="/catalog/uom" element={<UomListPage />} />
+                <Route path="/catalog/pricing" element={<PricingManagementPage />} />
               </Route>
             </Route>
 

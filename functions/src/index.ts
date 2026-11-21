@@ -100,5 +100,29 @@ export {
   getVariantMatrixJobStatus,
 } from './modules/catalog/variantJobs';
 
+// ============================================================================
+// PHASE 2 DAY 5: PRICING HIERARCHY & TAX CONFIGURATION
+// ============================================================================
+
+export {
+  upsertTaxConfiguration,
+  seedDefaultTaxConfigurations,
+  archiveTaxConfiguration,
+} from './modules/pricing/taxConfigurations';
+
+export {
+  upsertPricingRule,
+  archivePricingRule,
+  getEffectivePrice,
+  calculateTaxEndpoint,
+} from './modules/pricing/pricingRules';
+
+export {
+  updateVariantPricing,
+  bulkUpdateVariantPricing,
+  getPricingHistory,
+} from './modules/pricing/variantPricing';
+
+
 
 
