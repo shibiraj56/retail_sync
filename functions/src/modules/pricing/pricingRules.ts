@@ -213,19 +213,31 @@ export const getEffectivePrice = onCall(
 
       // Fetch Variant document if specified
       let variantData: any = null;
+      let restrictedPricingData: any = null;
+      const isPricingAdmin = ['OWNER', 'MANAGER'].includes(membership.role);
+
       if (variantId) {
-        const variantDoc = await productRef.collection('variants').doc(variantId).get();
+        const variantDocRef = productRef.collection('variants').doc(variantId);
+        const variantDoc = await variantDocRef.get();
         if (variantDoc.exists) {
           variantData = variantDoc.data();
+          // Only pricing admins are authorized to read protected restricted pricing
+          if (isPricingAdmin) {
+            const restrictedDoc = await variantDocRef.collection('restrictedPricing').doc('current').get();
+            if (restrictedDoc.exists) {
+              restrictedPricingData = restrictedDoc.data();
+            }
+          }
         }
       }
 
       // Base Catalog Pricing
       const mrpMinor = variantData?.pricing?.mrp ?? 0;
-      const costPriceMinor = variantData?.pricing?.costPrice ?? 0;
+      const costPriceMinor = restrictedPricingData?.costPrice ?? variantData?.pricing?.costPrice ?? 0;
       const sellingPriceMinor = variantData?.pricing?.sellingPrice ?? 0;
-      const wholesalePriceMinor = variantData?.pricing?.wholesalePrice;
-      const minimumSellingPriceMinor = variantData?.pricing?.minimumSellingPrice;
+      const wholesalePriceMinor = restrictedPricingData?.wholesalePrice ?? variantData?.pricing?.wholesalePrice;
+      const minimumSellingPriceMinor =
+        restrictedPricingData?.minimumSellingPrice ?? variantData?.pricing?.minimumSellingPrice;
 
       // Query active pricing rules for this product
       const rulesQuery = db
@@ -302,10 +314,8 @@ export const getEffectivePrice = onCall(
         }
       }
 
-      // Cost price visibility restriction:
-      // Redact cost price if caller holds CASHIER role without explicit accounting permissions
-      const isCashierRole = membership.role === 'CASHIER';
-
+      // Cost and margin information visibility restriction:
+      // Redact costPrice, wholesalePrice, and minimumSellingPrice for roles without pricing admin privileges (e.g. CASHIER, INVENTORY_MANAGER, ACCOUNTANT)
       return {
         success: true,
         productId,
@@ -317,10 +327,10 @@ export const getEffectivePrice = onCall(
         sourceRuleId,
         appliedOverride,
         mrpMinor,
-        costPriceMinor: isCashierRole ? undefined : costPriceMinor,
+        costPriceMinor: isPricingAdmin ? costPriceMinor : undefined,
         sellingPriceMinor,
-        wholesalePriceMinor,
-        minimumSellingPriceMinor,
+        wholesalePriceMinor: isPricingAdmin ? wholesalePriceMinor : undefined,
+        minimumSellingPriceMinor: isPricingAdmin ? minimumSellingPriceMinor : undefined,
       };
     } catch (error) {
       handleFunctionError(error);

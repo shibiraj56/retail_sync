@@ -63,7 +63,12 @@ export const updateVariantPricing = onCall(
       const now = firestore.Timestamp.now();
 
       await db.runTransaction(async (transaction) => {
-        const variantDoc = await transaction.get(variantRef);
+        const restrictedPricingRef = variantRef.collection('restrictedPricing').doc('current');
+        const [variantDoc, restrictedDoc] = await Promise.all([
+          transaction.get(variantRef),
+          transaction.get(restrictedPricingRef),
+        ]);
+
         if (!variantDoc.exists) {
           throw new NotFoundError(`Variant '${variantId}' not found under product '${productId}'`);
         }
@@ -73,19 +78,50 @@ export const updateVariantPricing = onCall(
           throw new ValidationError('Cannot modify pricing of an archived variant');
         }
 
-        const oldPricing = oldData.pricing || {
-          mrp: 0,
-          sellingPrice: 0,
-          costPrice: 0,
+        const restrictedData = restrictedDoc.exists ? restrictedDoc.data() : null;
+
+        const oldPricing = {
+          mrp: oldData.pricing?.mrp ?? 0,
+          sellingPrice: oldData.pricing?.sellingPrice ?? 0,
+          costPrice: restrictedData?.costPrice ?? oldData.pricing?.costPrice ?? 0,
+          wholesalePrice: restrictedData?.wholesalePrice ?? oldData.pricing?.wholesalePrice,
+          minimumSellingPrice: restrictedData?.minimumSellingPrice ?? oldData.pricing?.minimumSellingPrice,
         };
 
-        // 1. Update variant document
-        transaction.update(variantRef, {
-          pricing: parsedPricing.data,
-          updatedAt: now,
-        });
+        // 1. Update base variant document (public pricing only)
+        transaction.set(
+          variantRef,
+          {
+            pricing: {
+              mrp: parsedPricing.data.mrp,
+              sellingPrice: parsedPricing.data.sellingPrice,
+            },
+            'pricing.costPrice': firestore.FieldValue.delete(),
+            'pricing.wholesalePrice': firestore.FieldValue.delete(),
+            'pricing.minimumSellingPrice': firestore.FieldValue.delete(),
+            updatedAt: now,
+          },
+          { merge: true }
+        );
 
-        // 2. Write immutable pricing audit history entry
+        // 2. Write protected restricted pricing document
+        transaction.set(
+          restrictedPricingRef,
+          {
+            id: 'current',
+            organizationId,
+            productId,
+            variantId,
+            costPrice: parsedPricing.data.costPrice,
+            wholesalePrice: parsedPricing.data.wholesalePrice ?? null,
+            minimumSellingPrice: parsedPricing.data.minimumSellingPrice ?? null,
+            updatedAt: now,
+            createdAt: restrictedDoc.exists ? (restrictedData?.createdAt || now) : now,
+          },
+          { merge: true }
+        );
+
+        // 3. Write immutable pricing audit history entry
         const historyId = historyColRef.doc().id;
         transaction.set(historyColRef.doc(historyId), {
           id: historyId,
@@ -155,12 +191,20 @@ export const bulkUpdateVariantPricing = onCall(
           throw new NotFoundError(`Product '${productId}' not found`);
         }
 
-        // Read all target variants
+        // Read all target variants and their restrictedPricing documents in the read phase
         const variantRefs = updates.map((u) => variantsColRef.doc(u.variantId));
-        const variantDocs = await Promise.all(variantRefs.map((ref) => transaction.get(ref)));
+        const restrictedRefs = updates.map((u) =>
+          variantsColRef.doc(u.variantId).collection('restrictedPricing').doc('current')
+        );
+
+        const [variantDocs, restrictedDocs] = await Promise.all([
+          Promise.all(variantRefs.map((ref) => transaction.get(ref))),
+          Promise.all(restrictedRefs.map((ref) => transaction.get(ref))),
+        ]);
 
         for (let i = 0; i < variantDocs.length; i++) {
           const docSnap = variantDocs[i];
+          const restrictedSnap = restrictedDocs[i];
           const updateItem = updates[i];
           if (!docSnap.exists) {
             throw new NotFoundError(`Variant '${updateItem.variantId}' not found`);
@@ -170,15 +214,50 @@ export const bulkUpdateVariantPricing = onCall(
             throw new ValidationError(`Variant '${updateItem.variantId}' is archived`);
           }
 
-          const oldPricing = oldData.pricing || { mrp: 0, sellingPrice: 0, costPrice: 0 };
+          const restrictedData = restrictedSnap.exists ? restrictedSnap.data() : null;
 
-          // Update variant pricing
-          transaction.update(docSnap.ref, {
-            pricing: updateItem.pricing,
-            updatedAt: now,
-          });
+          const oldPricing = {
+            mrp: oldData.pricing?.mrp ?? 0,
+            sellingPrice: oldData.pricing?.sellingPrice ?? 0,
+            costPrice: restrictedData?.costPrice ?? oldData.pricing?.costPrice ?? 0,
+            wholesalePrice: restrictedData?.wholesalePrice ?? oldData.pricing?.wholesalePrice,
+            minimumSellingPrice: restrictedData?.minimumSellingPrice ?? oldData.pricing?.minimumSellingPrice,
+          };
 
-          // Log audit entry
+          // 1. Update base variant pricing (public retail fields only)
+          transaction.set(
+            docSnap.ref,
+            {
+              pricing: {
+                mrp: updateItem.pricing.mrp,
+                sellingPrice: updateItem.pricing.sellingPrice,
+              },
+              'pricing.costPrice': firestore.FieldValue.delete(),
+              'pricing.wholesalePrice': firestore.FieldValue.delete(),
+              'pricing.minimumSellingPrice': firestore.FieldValue.delete(),
+              updatedAt: now,
+            },
+            { merge: true }
+          );
+
+          // 2. Set protected restricted pricing document
+          transaction.set(
+            restrictedRefs[i],
+            {
+              id: 'current',
+              organizationId,
+              productId,
+              variantId: updateItem.variantId,
+              costPrice: updateItem.pricing.costPrice,
+              wholesalePrice: updateItem.pricing.wholesalePrice ?? null,
+              minimumSellingPrice: updateItem.pricing.minimumSellingPrice ?? null,
+              updatedAt: now,
+              createdAt: restrictedSnap.exists ? (restrictedData?.createdAt || now) : now,
+            },
+            { merge: true }
+          );
+
+          // 3. Log audit entry
           const historyId = historyColRef.doc().id;
           transaction.set(historyColRef.doc(historyId), {
             id: historyId,

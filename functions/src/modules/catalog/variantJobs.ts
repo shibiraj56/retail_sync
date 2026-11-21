@@ -410,23 +410,50 @@ export const processVariantMatrixJobChunk = onCall(
             }
           }
 
-          // Write Variant Document
-          transaction.set(variantsColRef.doc(varId), {
-            id: varId,
-            productId,
-            organizationId,
-            sku: normSku,
-            barcode: item.barcode || '',
-            additionalBarcodes: item.additionalBarcodes || [],
-            attributeValues: item.attributeValues,
-            pricing: item.pricing,
-            taxRatePercent: item.taxRatePercent,
-            trackInventory: item.trackInventory,
-            reorderPoint: item.reorderPoint,
-            status: item.status,
-            updatedAt: now,
-            createdAt: now,
-          }, { merge: true });
+          // Write Base Variant Document (Retail / POS facing)
+          transaction.set(
+            variantsColRef.doc(varId),
+            {
+              id: varId,
+              productId,
+              organizationId,
+              sku: normSku,
+              barcode: item.barcode || '',
+              additionalBarcodes: item.additionalBarcodes || [],
+              attributeValues: item.attributeValues,
+              pricing: {
+                mrp: item.pricing.mrp,
+                sellingPrice: item.pricing.sellingPrice,
+              },
+              taxRatePercent: item.taxRatePercent,
+              trackInventory: item.trackInventory,
+              reorderPoint: item.reorderPoint,
+              status: item.status,
+              updatedAt: now,
+              createdAt: now,
+              'pricing.costPrice': firestore.FieldValue.delete(),
+              'pricing.wholesalePrice': firestore.FieldValue.delete(),
+              'pricing.minimumSellingPrice': firestore.FieldValue.delete(),
+            },
+            { merge: true }
+          );
+
+          // Write Protected Restricted Pricing Document (Strictly OWNER / MANAGER)
+          transaction.set(
+            variantsColRef.doc(varId).collection('restrictedPricing').doc('current'),
+            {
+              id: 'current',
+              organizationId,
+              productId,
+              variantId: varId,
+              costPrice: item.pricing.costPrice,
+              wholesalePrice: item.pricing.wholesalePrice ?? null,
+              minimumSellingPrice: item.pricing.minimumSellingPrice ?? null,
+              updatedAt: now,
+              createdAt: now,
+            },
+            { merge: true }
+          );
 
           chunkProcessed++;
         }

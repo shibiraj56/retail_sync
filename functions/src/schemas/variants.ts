@@ -36,6 +36,34 @@ export const VariantAxesListSchema = z
 // 2. PRICING SCHEMAS
 // ============================================================================
 
+export const PublicVariantPricingSchema = z
+  .object({
+    mrp: SafeIntegerMoneySchema,
+    sellingPrice: SafeIntegerMoneySchema,
+  })
+  .refine(
+    (data) => {
+      if (data.mrp > 0 && data.sellingPrice > data.mrp) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: 'Selling price cannot exceed Maximum Retail Price (MRP)',
+      path: ['sellingPrice'],
+    }
+  );
+
+export type PublicVariantPricing = z.infer<typeof PublicVariantPricingSchema>;
+
+export const RestrictedVariantPricingSchema = z.object({
+  costPrice: SafeIntegerMoneySchema,
+  wholesalePrice: SafeIntegerMoneySchema.optional().nullable(),
+  minimumSellingPrice: SafeIntegerMoneySchema.optional().nullable(),
+});
+
+export type RestrictedVariantPricing = z.infer<typeof RestrictedVariantPricingSchema>;
+
 export const VariantPricingSchema = z
   .object({
     mrp: SafeIntegerMoneySchema,

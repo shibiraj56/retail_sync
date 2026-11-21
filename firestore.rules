@@ -156,6 +156,12 @@ service cloud.firestore {
         match /variants/{variantId} {
           allow read: if hasActiveMembership(orgId);
           allow write: if false;
+
+          // Protected cost price and internal margin information (Restricted to OWNER and MANAGER only)
+          match /restrictedPricing/{docId} {
+            allow read: if isPricingAdmin(orgId);
+            allow write: if false;
+          }
         }
       }
 

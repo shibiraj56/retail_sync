@@ -1019,4 +1019,152 @@ describe('Firestore Security Rules Comprehensive Security Audit Test Suite', () 
     // 5. SUSPENDED MEMBER: DENIED
     await assertFails(getHistRef(suspendedDb).get());
   });
+
+  // --- 19. Variant Restricted Pricing Security (AUDIT-COST-PRICE-SECURITY) ---
+  it('SEC-TC-PRICING-04-RESTRICTED-MARGINS: strictly isolates variant costPrice and margins to OWNER and MANAGER', async () => {
+    const orgId = 'org_variant_cost';
+    const prodId = 'prod_test_margin';
+    const varId = 'var_test_margin_1';
+
+    await testEnv.withSecurityRulesDisabled(async (adminContext) => {
+      const adminDb = adminContext.firestore();
+
+      // Seed organization
+      await adminDb.collection('organizations').doc(orgId).set({
+        id: orgId,
+        name: 'Cost Security Retail',
+        status: 'ACTIVE',
+      });
+
+      // Seed memberships for various roles
+      const members = [
+        { uid: 'u_owner_cost', role: 'OWNER', status: 'ACTIVE' },
+        { uid: 'u_manager_cost', role: 'MANAGER', status: 'ACTIVE' },
+        { uid: 'u_cashier_cost', role: 'CASHIER', status: 'ACTIVE' },
+        { uid: 'u_inv_mgr_cost', role: 'INVENTORY_MANAGER', status: 'ACTIVE' },
+        { uid: 'u_accountant_cost', role: 'ACCOUNTANT', status: 'ACTIVE' },
+        { uid: 'u_suspended_cost', role: 'MANAGER', status: 'SUSPENDED' },
+      ];
+
+      for (const m of members) {
+        await adminDb
+          .collection('userMemberships')
+          .doc(`${m.uid}_${orgId}`)
+          .set({
+            userId: m.uid,
+            organizationId: orgId,
+            role: m.role,
+            status: m.status,
+          });
+      }
+
+      // Seed base variant document (public retail pricing only)
+      await adminDb
+        .collection('organizations')
+        .doc(orgId)
+        .collection('products')
+        .doc(prodId)
+        .set({
+          id: prodId,
+          name: 'Public Product',
+        });
+
+      await adminDb
+        .collection('organizations')
+        .doc(orgId)
+        .collection('products')
+        .doc(prodId)
+        .collection('variants')
+        .doc(varId)
+        .set({
+          id: varId,
+          sku: 'SKU-COST-TEST',
+          pricing: {
+            mrp: 15000,
+            sellingPrice: 12000,
+          },
+          status: 'ACTIVE',
+        });
+
+      // Seed protected restrictedPricing subcollection
+      await adminDb
+        .collection('organizations')
+        .doc(orgId)
+        .collection('products')
+        .doc(prodId)
+        .collection('variants')
+        .doc(varId)
+        .collection('restrictedPricing')
+        .doc('current')
+        .set({
+          id: 'current',
+          organizationId: orgId,
+          productId: prodId,
+          variantId: varId,
+          costPrice: 7000,
+          wholesalePrice: 9500,
+          minimumSellingPrice: 10000,
+        });
+    });
+
+    const ownerDb = testEnv.authenticatedContext('u_owner_cost').firestore();
+    const managerDb = testEnv.authenticatedContext('u_manager_cost').firestore();
+    const cashierDb = testEnv.authenticatedContext('u_cashier_cost').firestore();
+    const invMgrDb = testEnv.authenticatedContext('u_inv_mgr_cost').firestore();
+    const accountantDb = testEnv.authenticatedContext('u_accountant_cost').firestore();
+    const suspendedDb = testEnv.authenticatedContext('u_suspended_cost').firestore();
+    const unauthedDb = testEnv.unauthenticatedContext().firestore();
+
+    const getBaseVariantRef = (dbInstance: any) =>
+      dbInstance
+        .collection('organizations')
+        .doc(orgId)
+        .collection('products')
+        .doc(prodId)
+        .collection('variants')
+        .doc(varId);
+
+    const getRestrictedPricingRef = (dbInstance: any) =>
+      dbInstance
+        .collection('organizations')
+        .doc(orgId)
+        .collection('products')
+        .doc(prodId)
+        .collection('variants')
+        .doc(varId)
+        .collection('restrictedPricing')
+        .doc('current');
+
+    // 1. Ordinary variant reads succeed for all active members (Cashier, Inventory Mgr, Accountant, etc.)
+    await assertSucceeds(getBaseVariantRef(ownerDb).get());
+    await assertSucceeds(getBaseVariantRef(managerDb).get());
+    await assertSucceeds(getBaseVariantRef(cashierDb).get());
+    await assertSucceeds(getBaseVariantRef(invMgrDb).get());
+    await assertSucceeds(getBaseVariantRef(accountantDb).get());
+
+    // 2. Restricted pricing reads: OWNER and MANAGER permitted
+    await assertSucceeds(getRestrictedPricingRef(ownerDb).get());
+    await assertSucceeds(getRestrictedPricingRef(managerDb).get());
+
+    // 3. Restricted pricing reads: CASHIER, INVENTORY_MANAGER, ACCOUNTANT strictly DENIED
+    await assertFails(getRestrictedPricingRef(cashierDb).get());
+    await assertFails(getRestrictedPricingRef(invMgrDb).get());
+    await assertFails(getRestrictedPricingRef(accountantDb).get());
+
+    // 4. Restricted pricing reads: SUSPENDED and unauthenticated DENIED
+    await assertFails(getRestrictedPricingRef(suspendedDb).get());
+    await assertFails(getRestrictedPricingRef(unauthedDb).get());
+
+    // 5. Direct client writes to restricted pricing are strictly DENIED for all roles (server-only via Cloud Functions)
+    await assertFails(
+      getRestrictedPricingRef(ownerDb).set({
+        costPrice: 5000,
+      })
+    );
+    await assertFails(
+      getRestrictedPricingRef(managerDb).update({
+        costPrice: 5000,
+      })
+    );
+  });
 });

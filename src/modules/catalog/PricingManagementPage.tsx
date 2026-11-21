@@ -189,7 +189,7 @@ export function PricingManagementPage(): JSX.Element {
 
   const { data: bulkVariants = [], isLoading: isLoadingBulkVariants } = useQuery({
     queryKey: ['productVariants', orgId, bulkProductId],
-    queryFn: () => (bulkProductId ? fetchVariants(orgId, bulkProductId) : []),
+    queryFn: () => (bulkProductId ? fetchVariants(orgId, bulkProductId, true) : []),
     enabled: !!orgId && !!bulkProductId,
   });
 

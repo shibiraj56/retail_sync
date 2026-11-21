@@ -502,8 +502,11 @@ export const saveProductVariantsSync = onCall(
             }
           }
 
-          // 3. Write Variant Document
-          const variantData = {
+          // 3. Write Base Variant Document (Retail / POS facing)
+          const docSnap = existingVariantDocs.find((d, idx) => variantRefs[idx].variantId === varId);
+          const isExisting = docSnap && docSnap.exists;
+
+          const variantData: Record<string, any> = {
             id: varId,
             productId,
             organizationId,
@@ -511,16 +514,44 @@ export const saveProductVariantsSync = onCall(
             barcode: v.barcode ? v.barcode.trim().toUpperCase() : '',
             additionalBarcodes: v.additionalBarcodes ? v.additionalBarcodes.map((b) => b.trim().toUpperCase()) : [],
             attributeValues: v.attributeValues,
-            pricing: v.pricing,
+            pricing: {
+              mrp: v.pricing.mrp,
+              sellingPrice: v.pricing.sellingPrice,
+            },
             taxRatePercent: v.taxRatePercent,
             trackInventory: v.trackInventory,
             reorderPoint: v.reorderPoint,
             status: v.status,
             updatedAt: now,
-            createdAt: now,
+            createdAt: isExisting ? (docSnap.data()?.createdAt || now) : now,
           };
 
+          // Explicitly purge legacy cost price fields from top-level document
+          if (isExisting) {
+            variantData['pricing.costPrice'] = firestore.FieldValue.delete();
+            variantData['pricing.wholesalePrice'] = firestore.FieldValue.delete();
+            variantData['pricing.minimumSellingPrice'] = firestore.FieldValue.delete();
+          }
+
           transaction.set(item.variantRef, variantData, { merge: true });
+
+          // 3b. Write Protected Restricted Pricing Document (Strictly OWNER / MANAGER)
+          const restrictedPricingRef = item.variantRef.collection('restrictedPricing').doc('current');
+          transaction.set(
+            restrictedPricingRef,
+            {
+              id: 'current',
+              organizationId,
+              productId,
+              variantId: varId,
+              costPrice: v.pricing.costPrice,
+              wholesalePrice: v.pricing.wholesalePrice ?? null,
+              minimumSellingPrice: v.pricing.minimumSellingPrice ?? null,
+              updatedAt: now,
+              createdAt: now,
+            },
+            { merge: true }
+          );
         }
 
         // 4. Update Product master flag

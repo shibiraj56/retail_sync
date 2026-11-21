@@ -72,10 +72,14 @@ The engine validates commercial and statutory price boundaries via `validatePric
 
 ---
 
-## 4. Role-Based Price Field Redaction & History Access
+## 4. Role-Based Price Field Redaction & Margin Isolation
 
 To safeguard wholesale purchasing margins and internal landed costs from unauthorized personnel:
-- **`getEffectivePrice` Cloud Function:** When called by a user with role `CASHIER`, `costPriceMinor` is automatically redacted (`undefined`).
+- **Separated Subcollection Architecture:** Sensitive margin fields (`costPrice`, `wholesalePrice`, `minimumSellingPrice`) are completely segregated from the top-level variant document into a dedicated subcollection:
+  `/organizations/{orgId}/products/{productId}/variants/{variantId}/restrictedPricing/current`
+- **Firestore Security Rules:** Access to `/restrictedPricing/{docId}` is strictly restricted via `isPricingAdmin(orgId)` to **`OWNER`** and **`MANAGER`** roles only. Access is completely denied to **`CASHIER`**, **`INVENTORY_MANAGER`**, and **`ACCOUNTANT`**. Direct client writes are rejected (`allow write: if false;`).
+- **Base Variant Public Pricing:** The top-level variant document (`/variants/{variantId}`) contains only public retail pricing (`mrp`, `sellingPrice`), permitting ordinary variant reads by Cashiers, inventory staff, and future POS systems without leaking sensitive margins.
+- **`getEffectivePrice` Cloud Function:** Acts as the authoritative pricing endpoint. When called by a user with role `CASHIER`, `INVENTORY_MANAGER`, or `ACCOUNTANT`, `costPriceMinor`, `wholesalePriceMinor`, and `minimumSellingPriceMinor` are automatically redacted (`undefined`).
 - **`pricingHistory` Audit Trail:** Both direct Firestore reads (`/organizations/{orgId}/pricingHistory`) and the backend `getPricingHistory` callable are strictly restricted to **`OWNER`** and **`MANAGER`** roles. Roles `CASHIER`, `INVENTORY_MANAGER`, and `ACCOUNTANT` are denied access to pricing history to prevent exposure of historical purchase costs and margin changes.
 
 ---

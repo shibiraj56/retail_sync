@@ -35,7 +35,8 @@ All tenant and store-level documents follow a strictly standardized **Organizati
   │     ├── /cashDrawers/{drawerSessionId}                          [Cash Drawer Shifts]
   │     └── /heldBills/{heldBillId}                                 [Parked Carts - No Stock Lock]
   ├── /products/{productId}                                         [Organization Master Catalog]
-  │     └── /variants/{variantId}                                   [Product Variants / SKUs]
+  │     └── /variants/{variantId}                                   [Product Variants / SKUs (Public Pricing)]
+  │           └── /restrictedPricing/{docId}                        [Protected Landed Cost & Margins - Admin Only]
   ├── /categories/{categoryId}                                      [Catalog Taxonomies]
   ├── /brands/{brandId}                                             [Brand Directory]
   ├── /unitsOfMeasure/{uomId}                                       [UoM & Conversion Factors]
@@ -214,16 +215,29 @@ interface ProductVariantDocument {
   additionalBarcodes?: string[];
   attributeValues: Record<string, string>; // e.g., { "Size": "XL", "Color": "Navy Blue" }
   pricing: {
-    mrp: number; // Maximum Retail Price
-    sellingPrice: number; // Authoritative Base Selling Price
-    wholesalePrice?: number;
-    minimumSellingPrice?: number;
-    costPrice: number; // Authoritative Cost for margin calculation
+    mrp: number; // Maximum Retail Price (paise)
+    sellingPrice: number; // Authoritative Base Selling Price (paise)
   };
   taxRatePercent: number; // e.g., 0.0, 5.0, 12.0, 18.0, 28.0
   trackInventory: boolean;
   reorderPoint: number;
-  status: "ACTIVE" | "INACTIVE";
+  status: "ACTIVE" | "INACTIVE" | "ARCHIVED";
+  createdAt: FirebaseFirestore.Timestamp;
+  updatedAt: FirebaseFirestore.Timestamp;
+}
+```
+
+#### Subcollection: `/organizations/{orgId}/products/{productId}/variants/{variantId}/restrictedPricing/current`
+*(Restricted to OWNER and MANAGER roles only. Stripped from public variant reads to protect gross margins)*
+```typescript
+interface RestrictedVariantPricingDocument {
+  id: "current";
+  organizationId: string;
+  productId: string;
+  variantId: string;
+  costPrice: number; // Authoritative Landed Cost in integer minor units (paise)
+  wholesalePrice?: number | null; // Optional wholesale tier in integer minor units (paise)
+  minimumSellingPrice?: number | null; // Optional floor price in integer minor units (paise)
   createdAt: FirebaseFirestore.Timestamp;
   updatedAt: FirebaseFirestore.Timestamp;
 }

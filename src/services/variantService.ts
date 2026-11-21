@@ -1,5 +1,5 @@
 import { httpsCallable } from 'firebase/functions';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import { db, functions } from '../config/firebase';
 import type {
   ProductVariantDocument,
@@ -11,7 +11,8 @@ import type {
 
 export async function fetchVariants(
   organizationId: string,
-  productId: string
+  productId: string,
+  includeRestricted: boolean = false
 ): Promise<ProductVariantDocument[]> {
   const variantsRef = collection(
     db,
@@ -24,7 +25,7 @@ export async function fetchVariants(
   const q = query(variantsRef, orderBy('createdAt', 'desc'));
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((docSnap) => {
+  const variants = snapshot.docs.map((docSnap) => {
     const data = docSnap.data();
     return {
       ...data,
@@ -33,6 +34,47 @@ export async function fetchVariants(
       updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toISOString() : data.updatedAt,
     } as ProductVariantDocument;
   });
+
+  if (!includeRestricted) {
+    return variants;
+  }
+
+  // Enrich with protected restricted pricing for authorized pricing admins (OWNER / MANAGER)
+  const enriched = await Promise.all(
+    variants.map(async (v) => {
+      try {
+        const restRef = doc(
+          db,
+          'organizations',
+          organizationId,
+          'products',
+          productId,
+          'variants',
+          v.id,
+          'restrictedPricing',
+          'current'
+        );
+        const restSnap = await getDoc(restRef);
+        if (restSnap.exists()) {
+          const restData = restSnap.data();
+          return {
+            ...v,
+            pricing: {
+              ...v.pricing,
+              costPrice: restData.costPrice ?? v.pricing?.costPrice,
+              wholesalePrice: restData.wholesalePrice ?? v.pricing?.wholesalePrice,
+              minimumSellingPrice: restData.minimumSellingPrice ?? v.pricing?.minimumSellingPrice,
+            },
+          };
+        }
+      } catch (err) {
+        // Enforced by Security Rules: Non-admin roles (e.g. CASHIER) fail safely and receive public pricing
+      }
+      return v;
+    })
+  );
+
+  return enriched;
 }
 
 export async function previewVariantMatrix(params: {

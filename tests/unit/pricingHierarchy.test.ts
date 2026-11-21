@@ -23,7 +23,7 @@ interface ResolveEffectivePriceParams {
   storeId?: string;
   customerId?: string;
   customerGroupId?: string;
-  callerRole: 'OWNER' | 'MANAGER' | 'CASHIER' | 'OPERATOR';
+  callerRole: 'OWNER' | 'MANAGER' | 'CASHIER' | 'OPERATOR' | 'INVENTORY_MANAGER' | 'ACCOUNTANT';
   atTimestamp?: string;
 }
 
@@ -134,13 +134,13 @@ function resolveEffectivePrice(params: ResolveEffectivePriceParams) {
     }
   }
 
-  // Cashier role redaction check
-  const isCashierRole = params.callerRole === 'CASHIER';
+  // Pricing admin role check: only OWNER and MANAGER are authorized to view cost price
+  const isPricingAdmin = params.callerRole === 'OWNER' || params.callerRole === 'MANAGER';
 
   return {
     effectivePriceMinor,
     mrpMinor: params.mrpMinor,
-    costPriceMinor: isCashierRole ? undefined : params.costPriceMinor,
+    costPriceMinor: isPricingAdmin ? params.costPriceMinor : undefined,
     appliedOverride,
     pricingLevel,
     sourceRuleId,
@@ -414,7 +414,7 @@ describe('Pricing Hierarchy Precedence Engine', () => {
     expect(result.effectivePriceMinor).toBe(9400); // Newer rule wins tie-break
   });
 
-  it('redacts costPrice for CASHIER role to protect business gross margins', () => {
+  it('redacts costPrice for CASHIER, INVENTORY_MANAGER, and ACCOUNTANT roles to protect business gross margins', () => {
     const cashierResult = resolveEffectivePrice({
       productId: 'prod_100',
       variantId: 'var_100_s',
@@ -427,6 +427,30 @@ describe('Pricing Hierarchy Precedence Engine', () => {
 
     expect(cashierResult.costPriceMinor).toBeUndefined(); // Redacted!
 
+    const invMgrResult = resolveEffectivePrice({
+      productId: 'prod_100',
+      variantId: 'var_100_s',
+      baseVariantPriceMinor: 10000,
+      mrpMinor: 12000,
+      costPriceMinor: 7000,
+      rules: baseRules,
+      callerRole: 'INVENTORY_MANAGER',
+    });
+
+    expect(invMgrResult.costPriceMinor).toBeUndefined(); // Redacted!
+
+    const accountantResult = resolveEffectivePrice({
+      productId: 'prod_100',
+      variantId: 'var_100_s',
+      baseVariantPriceMinor: 10000,
+      mrpMinor: 12000,
+      costPriceMinor: 7000,
+      rules: baseRules,
+      callerRole: 'ACCOUNTANT',
+    });
+
+    expect(accountantResult.costPriceMinor).toBeUndefined(); // Redacted!
+
     const managerResult = resolveEffectivePrice({
       productId: 'prod_100',
       variantId: 'var_100_s',
@@ -438,5 +462,17 @@ describe('Pricing Hierarchy Precedence Engine', () => {
     });
 
     expect(managerResult.costPriceMinor).toBe(7000); // Visible to manager
+
+    const ownerResult = resolveEffectivePrice({
+      productId: 'prod_100',
+      variantId: 'var_100_s',
+      baseVariantPriceMinor: 10000,
+      mrpMinor: 12000,
+      costPriceMinor: 7000,
+      rules: baseRules,
+      callerRole: 'OWNER',
+    });
+
+    expect(ownerResult.costPriceMinor).toBe(7000); // Visible to owner
   });
 });

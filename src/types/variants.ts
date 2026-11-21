@@ -24,6 +24,34 @@ export const VariantAxesListSchema = z
     (axes) => ({ message: validateVariantAxes(axes).error || 'Invalid variant axes configuration' })
   );
 
+export const PublicVariantPricingSchema = z
+  .object({
+    mrp: SafeIntegerMoneySchema,
+    sellingPrice: SafeIntegerMoneySchema,
+  })
+  .refine(
+    (data) => {
+      if (data.mrp > 0 && data.sellingPrice > data.mrp) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: 'Selling price cannot exceed Maximum Retail Price (MRP)',
+      path: ['sellingPrice'],
+    }
+  );
+
+export type PublicVariantPricing = z.infer<typeof PublicVariantPricingSchema>;
+
+export const RestrictedVariantPricingSchema = z.object({
+  costPrice: SafeIntegerMoneySchema,
+  wholesalePrice: SafeIntegerMoneySchema.optional().nullable(),
+  minimumSellingPrice: SafeIntegerMoneySchema.optional().nullable(),
+});
+
+export type RestrictedVariantPricing = z.infer<typeof RestrictedVariantPricingSchema>;
+
 export const VariantPricingSchema = z
   .object({
     mrp: SafeIntegerMoneySchema,
@@ -57,11 +85,29 @@ export interface ProductVariantDocument {
   barcode: string;
   additionalBarcodes?: string[];
   attributeValues: Record<string, string>;
-  pricing: VariantPricing;
+  pricing: {
+    mrp: number;
+    sellingPrice: number;
+    costPrice?: number;
+    wholesalePrice?: number;
+    minimumSellingPrice?: number;
+  };
   taxRatePercent: number;
   trackInventory: boolean;
   reorderPoint: number;
   status: VariantStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RestrictedVariantPricingDocument {
+  id: string;
+  organizationId: string;
+  productId: string;
+  variantId: string;
+  costPrice: number;
+  wholesalePrice?: number | null;
+  minimumSellingPrice?: number | null;
   createdAt: string;
   updatedAt: string;
 }
