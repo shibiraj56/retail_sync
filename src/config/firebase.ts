@@ -24,25 +24,38 @@ export const storage = getStorage(app);
 // Connect to Local Firebase Emulators when configured
 const useEmulators = import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true';
 
-if (useEmulators && typeof window !== 'undefined') {
-  const host = window.location.hostname || '127.0.0.1';
+if (useEmulators) {
+  const defaultHost = (typeof window !== 'undefined' && window.location.hostname) || '127.0.0.1';
 
   try {
     // Connect Auth Emulator
-    const authHost = import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_HOST || `http://${host}:9099`;
+    const authHost = import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_HOST || `http://${defaultHost}:9099`;
     connectAuthEmulator(auth, authHost, { disableWarnings: true });
 
     // Connect Firestore Emulator
+    const firestoreHost = import.meta.env.VITE_FIREBASE_FIRESTORE_EMULATOR_HOST || defaultHost;
     const firestorePort = Number(import.meta.env.VITE_FIREBASE_FIRESTORE_EMULATOR_PORT) || 8080;
-    connectFirestoreEmulator(db, host, firestorePort);
+    connectFirestoreEmulator(db, firestoreHost, firestorePort);
 
     // Connect Cloud Functions Emulator
-    const functionsPort = 5001;
-    connectFunctionsEmulator(functions, host, functionsPort);
+    let functionsHost = defaultHost;
+    let functionsPort = 5001;
+    if (import.meta.env.VITE_FIREBASE_FUNCTIONS_EMULATOR_HOST) {
+      try {
+        const fnUrl = new URL(import.meta.env.VITE_FIREBASE_FUNCTIONS_EMULATOR_HOST);
+        functionsHost = fnUrl.hostname;
+        functionsPort = Number(fnUrl.port) || 5001;
+      } catch {
+        functionsHost = defaultHost;
+        functionsPort = 5001;
+      }
+    }
+    connectFunctionsEmulator(functions, functionsHost, functionsPort);
 
     // Connect Storage Emulator
+    const storageHost = import.meta.env.VITE_FIREBASE_STORAGE_EMULATOR_HOST || defaultHost;
     const storagePort = Number(import.meta.env.VITE_FIREBASE_STORAGE_EMULATOR_PORT) || 9199;
-    connectStorageEmulator(storage, host, storagePort);
+    connectStorageEmulator(storage, storageHost, storagePort);
 
     console.info('[Firebase] Connected to local Firebase Emulators');
   } catch (err) {

@@ -7,6 +7,7 @@ import { Mail, Lock, AlertCircle, ArrowRight } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { authService } from '../../services/authService';
+import { useAuthStore } from '../../stores/authStore';
 
 const LoginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -17,6 +18,7 @@ type LoginFormData = z.infer<typeof LoginSchema>;
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const { setUser } = useAuthStore();
   const [authError, setAuthError] = useState<string | null>(null);
 
   const {
@@ -30,7 +32,8 @@ export const LoginPage: React.FC = () => {
   const onSubmit = async (data: LoginFormData) => {
     setAuthError(null);
     try {
-      await authService.login(data.email, data.password);
+      const user = await authService.login(data.email, data.password);
+      setUser(user);
       navigate('/');
     } catch (err: unknown) {
       const errorMsg =

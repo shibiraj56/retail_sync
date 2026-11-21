@@ -20,10 +20,12 @@ service firebase.storage {
     match /organizations/{orgId} {
       match /products/{productId}/{imageFile} {
         allow read: if belongsToOrg(orgId);
-        // Only valid images under 5MB allowed
-        allow write: if belongsToOrg(orgId) &&
+        // Only valid images under 5MB allowed on creation and updates
+        allow create, update: if belongsToOrg(orgId) &&
           request.resource.size < 5 * 1024 * 1024 &&
           request.resource.contentType.matches('image/.*');
+        // Deletion permitted for organization members
+        allow delete: if belongsToOrg(orgId);
       }
 
       match /{allPaths=**} {

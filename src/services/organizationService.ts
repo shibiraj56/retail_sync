@@ -7,7 +7,7 @@ import {
   query,
   where,
 } from 'firebase/firestore';
-import { db, functions } from '../config/firebase';
+import { db, auth, functions } from '../config/firebase';
 import type {
   Organization,
   Store,
@@ -79,6 +79,19 @@ export const organizationService = {
     storeId: string;
     membershipId: string;
   }> {
+    // 1. Verify user is authenticated
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('Authentication token is required. Please sign in to continue.');
+    }
+
+    // 2. Obtain / refresh the current user's ID token to ensure active auth context
+    try {
+      await currentUser.getIdToken(true);
+    } catch {
+      throw new Error('Authentication session expired. Please sign in again.');
+    }
+
     const callable = httpsCallable<ProvisionOrgParams, {
       organizationId: string;
       storeId: string;
@@ -86,6 +99,14 @@ export const organizationService = {
     }>(functions, 'provisionOrganization');
 
     const result = await callable(params);
+
+    // 3. Force refresh token so updated custom claims (orgId, role) are active locally
+    try {
+      await currentUser.getIdToken(true);
+    } catch {
+      // Non-critical if claims refresh is delayed
+    }
+
     return result.data;
   },
 

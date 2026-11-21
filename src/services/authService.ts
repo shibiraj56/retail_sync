@@ -35,6 +35,9 @@ export const authService = {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(cred.user, { displayName });
 
+    // Refresh ID token to ensure active auth token with updated profile
+    await cred.user.getIdToken(true);
+
     // Sync user profile to Firestore
     try {
       const syncUserCallable = httpsCallable(functions, 'syncUser');

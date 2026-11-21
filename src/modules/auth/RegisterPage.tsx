@@ -7,6 +7,7 @@ import { Mail, Lock, User, AlertCircle, ArrowRight } from 'lucide-react';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { authService } from '../../services/authService';
+import { useAuthStore } from '../../stores/authStore';
 
 const RegisterSchema = z
   .object({
@@ -24,6 +25,7 @@ type RegisterFormData = z.infer<typeof RegisterSchema>;
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
+  const { setUser } = useAuthStore();
   const [authError, setAuthError] = useState<string | null>(null);
 
   const {
@@ -37,7 +39,8 @@ export const RegisterPage: React.FC = () => {
   const onSubmit = async (data: RegisterFormData) => {
     setAuthError(null);
     try {
-      await authService.register(data.email, data.password, data.displayName);
+      const user = await authService.register(data.email, data.password, data.displayName);
+      setUser(user);
       // Direct new user to setup their organization
       navigate('/setup-organization');
     } catch (err: unknown) {

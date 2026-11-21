@@ -92,18 +92,30 @@ export const upsertMasterProduct = onCall(
         const codeRegDoc = await transaction.get(codeRegistryRef);
         if (codeRegDoc.exists) {
           const regData = codeRegDoc.data();
-          if (regData && regData.targetDocumentId !== productId) {
-            throw new ConflictError(
-              `Product code '${normalizedCode}' is already registered to another product in this organization`
-            );
+          if (regData) {
+            if (regData.status === 'RESERVED_ARCHIVED') {
+              throw new ConflictError(
+                `Product code '${normalizedCode}' is permanently reserved and cannot be reused`
+              );
+            }
+            if (regData.targetDocumentId !== productId) {
+              throw new ConflictError(
+                `Product code '${normalizedCode}' is already registered to another product in this organization`
+              );
+            }
           }
         }
 
-        // B. Existing Product Check
+        // B. Existing Product Check & Archival Lockdown
         const existingProductDoc = await transaction.get(productRef);
         let oldCode: string | null = null;
         if (existingProductDoc.exists) {
           const oldData = existingProductDoc.data();
+          if (oldData?.status === 'ARCHIVED') {
+            throw new ValidationError(
+              `Product '${productId}' is archived. Modifications to archived products are strictly forbidden.`
+            );
+          }
           oldCode = oldData?.code ? oldData.code.toUpperCase() : null;
         }
 
@@ -114,6 +126,8 @@ export const upsertMasterProduct = onCall(
             .doc(organizationId)
             .collection('codeRegistry')
             .doc(`PRODUCT_${oldCode}`);
+          // Lock old code registry entry during read phase
+          await transaction.get(oldCodeRegistryRef);
         }
 
         // C. Category Existence & Active Validation

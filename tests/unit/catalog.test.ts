@@ -412,5 +412,33 @@ describe('Phase 2 Master Data — Unit Test Suite', () => {
       const result = UpsertProductInputSchema.safeParse(invalidRatePayload);
       expect(result.success).toBe(false);
     });
+
+    it('should reject secondary unit conversion factor if negative or non-finite', () => {
+      const negativeFactorPayload = {
+        ...validBaseProduct,
+        baseUomId: 'uom_pcs',
+        secondaryUomId: 'uom_box',
+        uomConversionFactor: -5,
+      };
+
+      const result = UpsertProductInputSchema.safeParse(negativeFactorPayload);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.errors[0].message).toContain('positive');
+      }
+    });
+
+    it('should reject product payload if code is empty or single character', () => {
+      const shortCodePayload = {
+        ...validBaseProduct,
+        code: 'A',
+      };
+
+      const result = UpsertProductInputSchema.safeParse(shortCodePayload);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.errors[0].message).toContain('at least 2 characters');
+      }
+    });
   });
 });
