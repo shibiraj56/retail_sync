@@ -55,26 +55,49 @@ Every pricing rule maintains an effective interval:
 - **Safe Integer Limits**: Bounds checked against `Number.MAX_SAFE_INTEGER` ($9,007,199,254,740,991$ minor units $\approx ₹90\text{ Trillion}$).
 - **Banker's / Commercial Half-Up Rounding**: Conversion from major units or fractional tax multipliers applies `Math.round(val)` to avoid downward truncations.
 
-### 3.2 Price Relationship Invariants
-The engine asserts logical consistency across all price components:
+### 3.2 Price Relationship Invariants & Below-Cost Sales Policy
+The engine validates commercial and statutory price boundaries via `validatePriceRelationship`:
 
-$$\text{costPrice} \le \text{sellingPrice} \le \text{mrp}$$
-$$\text{minimumSellingPrice} \le \text{sellingPrice}$$
-$$\text{wholesalePrice} \le \text{mrp}$$
+1. **Maximum Retail Price (MRP) Ceilings (Statutory):**
+   $$\text{sellingPrice} \le \text{mrp} \quad (\text{when } \text{mrp} > 0)$$
+   $$\text{wholesalePrice} \le \text{mrp} \quad (\text{when } \text{mrp} > 0)$$
+   Enforces legal compliance under the Indian Legal Metrology (Packaged Commodities) Rules: goods cannot be sold or offered at a base price exceeding the printed MRP.
 
-If an update violates these bounds (e.g., selling price exceeding legal MRP), the transaction aborts with a descriptive `ValidationError`.
+2. **Price Floor Integrity:**
+   $$\text{minimumSellingPrice} \le \text{sellingPrice}$$
+   Prevents accidental front-line discounting below the authorized floor price.
 
----
-
-## 4. Role-Based Price Field Redaction
-
-To safeguard wholesale purchasing margins and internal landed costs from front-line personnel:
-- When `getEffectivePrice` is called by a user with role `CASHIER`, `costPriceMinor` is automatically redacted (`undefined`).
-- Roles `OWNER`, `MANAGER`, and `STORE_MANAGER` retain full access to landed `costPriceMinor` for margin analytics.
+3. **Below-Cost / Clearance Pricing Permitted:**
+   The system deliberately does **NOT** enforce $\text{costPrice} \le \text{sellingPrice}$. Selling below purchase cost (such as seasonal clearances, perishable stock liquidations, loss-leader promotions, or distressed inventory sales) is fully permitted by the software, subject to the organization's commercial policies and manager authorization controls.
 
 ---
 
-## 5. Immutable Price & Tax Snapshots
+## 4. Role-Based Price Field Redaction & History Access
+
+To safeguard wholesale purchasing margins and internal landed costs from unauthorized personnel:
+- **`getEffectivePrice` Cloud Function:** When called by a user with role `CASHIER`, `costPriceMinor` is automatically redacted (`undefined`).
+- **`pricingHistory` Audit Trail:** Both direct Firestore reads (`/organizations/{orgId}/pricingHistory`) and the backend `getPricingHistory` callable are strictly restricted to **`OWNER`** and **`MANAGER`** roles. Roles `CASHIER`, `INVENTORY_MANAGER`, and `ACCOUNTANT` are denied access to pricing history to prevent exposure of historical purchase costs and margin changes.
+
+---
+
+## 5. Trade Discount Deductibility & Statutory Boundaries (Section 15 CGST Act)
+
+Financial calculations in Retail Sync distinguish between discount types:
+
+1. **Pre-Supply and At-Supply Discounts (Section 15(3)(a)):**
+   Discounts given *before or at the time of supply* and duly recorded on the invoice face (trade discounts, line discounts, promotional percent/amount deductions) **are legally deductible** from the transaction value to arrive at the net taxable value for GST computation. This is the sole discount model implemented in Phase 2.
+
+2. **Post-Supply Discounts (Section 15(3)(b) Statutory Warning):**
+   Discounts granted *after the supply* (such as retrospective turnover rebates, volume targets, or early cash settlement discounts) are legally deductible from taxable value **ONLY IF**:
+   - The discount is established in terms of an agreement entered into at or before the time of supply and specifically linked to the relevant invoices, AND
+   - Input Tax Credit (ITC) attributable to the discount has been formally reversed by the recipient on the basis of a credit note issued by the supplier.
+   
+> [!CAUTION]
+> Downstream POS and invoicing code (Phase 4) is **strictly prohibited** from treating generic post-supply rebates, credit notes, or cash discounts as an automatic taxable-value deduction without verification of prior contractual agreement and recipient ITC reversal. Full business and tax compliance cannot be claimed without these statutory checks.
+
+---
+
+## 6. Immutable Price & Tax Snapshots
 
 Sales invoices, register receipts, and orders must never rely on live catalog pointers because catalog prices may change post-sale. 
 

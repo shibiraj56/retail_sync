@@ -54,6 +54,11 @@ $$\text{FinalPayable} = \text{NetGross}$$
 
 *(Note: $\text{RateBps} = \text{TaxRatePercent} \times 100$, e.g. $18\% \rightarrow 1800$ basis points).*
 
+### 3.4 Statutory Discount Treatment (Section 15 CGST Act)
+The current calculation engine models discounts strictly under **Section 15(3)(a) of the CGST Act**:
+- Deductions apply only to **pre-supply or at-supply trade discounts** explicitly recorded in the invoice.
+- **Prohibition on Post-Supply Discounts:** Downstream modules must not treat post-supply financial rebates, credit adjustments, or prompt payment cash discounts as taxable base reductions unless the conditions of Section 15(3)(b) are formally met (pre-existing agreement linked to specific invoices + proven reversal of input tax credit by the customer). Commercial or automated test success does not constitute statutory compliance without these business and legal validations.
+
 ---
 
 ## 4. Odd-Paise Split Balancing Algorithm

@@ -1,7 +1,7 @@
 import { onCall, CallableRequest } from 'firebase-functions/v2/https';
 import { firestore } from 'firebase-admin';
 import { db } from '../../config/firebase';
-import { requireMembership, requireRole } from '../../middleware/auth';
+import { requireRole } from '../../middleware/auth';
 import {
   ValidationError,
   NotFoundError,
@@ -225,7 +225,7 @@ export const getPricingHistory = onCall(
         throw new ValidationError('organizationId and productId are required');
       }
 
-      await requireMembership(request, organizationId);
+      await requireRole(request, organizationId, [...PRICING_ADMIN_ROLES]);
 
       let historyQuery = db
         .collection('organizations')

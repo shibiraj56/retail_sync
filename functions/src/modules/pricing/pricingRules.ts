@@ -135,6 +135,39 @@ export const archivePricingRule = onCall(
 );
 
 /**
+ * Deterministically ranks rules within the same precedence tier:
+ * 1. Specificity: Variant-specific rule beats whole-product rule where variantId is specified.
+ * 2. Recency: Most recently created/effective rule wins.
+ * 3. Stable Tie-breaker: Lexicographical document ID descending.
+ */
+export function comparePricingRules(a: any, b: any, targetVariantId?: string): number {
+  if (targetVariantId) {
+    const aIsVariant = a.variantId === targetVariantId ? 1 : 0;
+    const bIsVariant = b.variantId === targetVariantId ? 1 : 0;
+    if (aIsVariant !== bIsVariant) {
+      return bIsVariant - aIsVariant;
+    }
+  }
+
+  const getMillis = (val: any): number => {
+    if (!val) return 0;
+    if (typeof val.toMillis === 'function') return val.toMillis();
+    if (typeof val.toDate === 'function') return val.toDate().getTime();
+    if (val._seconds) return val._seconds * 1000;
+    const parsed = new Date(val).getTime();
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const timeA = getMillis(a.createdAt || a.effectiveStartDate);
+  const timeB = getMillis(b.createdAt || b.effectiveStartDate);
+  if (timeB !== timeA) {
+    return timeB - timeA;
+  }
+
+  return String(b.id || '').localeCompare(String(a.id || ''));
+}
+
+/**
  * 3. Evaluates the hierarchical pricing precedence:
  * Customer -> Customer Group -> Store Override -> Variant Price -> Product Default.
  * Redacts cost price if caller is CASHIER.
@@ -224,12 +257,14 @@ export const getEffectivePrice = onCall(
       let sourceRuleId: string | undefined = undefined;
       let appliedOverride = false;
 
-      // Precedence 1: Customer-Specific Override
+      // Precedence 1: Customer-Specific Override (with deterministic specificity & tie-breaker)
       if (customerId) {
-        const customerRule = matchingRules.find(
-          (r) => r.level === 'CUSTOMER' && r.targetEntityId === customerId
-        );
-        if (customerRule) {
+        const customerRules = matchingRules
+          .filter((r) => r.level === 'CUSTOMER' && r.targetEntityId === customerId)
+          .sort((a, b) => comparePricingRules(a, b, variantId));
+
+        if (customerRules.length > 0) {
+          const customerRule = customerRules[0];
           effectivePriceMinor = customerRule.priceMinor;
           pricingLevel = 'CUSTOMER';
           sourceRuleId = customerRule.id;
@@ -237,12 +272,14 @@ export const getEffectivePrice = onCall(
         }
       }
 
-      // Precedence 2: Customer-Group Tier
+      // Precedence 2: Customer-Group Tier (with deterministic specificity & tie-breaker)
       if (!appliedOverride && customerGroupId) {
-        const groupRule = matchingRules.find(
-          (r) => r.level === 'CUSTOMER_GROUP' && r.targetEntityId === customerGroupId
-        );
-        if (groupRule) {
+        const groupRules = matchingRules
+          .filter((r) => r.level === 'CUSTOMER_GROUP' && r.targetEntityId === customerGroupId)
+          .sort((a, b) => comparePricingRules(a, b, variantId));
+
+        if (groupRules.length > 0) {
+          const groupRule = groupRules[0];
           effectivePriceMinor = groupRule.priceMinor;
           pricingLevel = 'CUSTOMER_GROUP';
           sourceRuleId = groupRule.id;
@@ -250,12 +287,14 @@ export const getEffectivePrice = onCall(
         }
       }
 
-      // Precedence 3: Store-Level Branch Override
+      // Precedence 3: Store-Level Branch Override (with deterministic specificity & tie-breaker)
       if (!appliedOverride && storeId) {
-        const storeRule = matchingRules.find(
-          (r) => r.level === 'STORE' && r.targetEntityId === storeId
-        );
-        if (storeRule) {
+        const storeRules = matchingRules
+          .filter((r) => r.level === 'STORE' && r.targetEntityId === storeId)
+          .sort((a, b) => comparePricingRules(a, b, variantId));
+
+        if (storeRules.length > 0) {
+          const storeRule = storeRules[0];
           effectivePriceMinor = storeRule.priceMinor;
           pricingLevel = 'STORE';
           sourceRuleId = storeRule.id;

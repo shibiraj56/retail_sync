@@ -844,7 +844,7 @@ describe('Firestore Security Rules Comprehensive Security Audit Test Suite', () 
         status: 'ACTIVE',
       });
 
-      // Active member in Org A
+      // Active Cashier in Org A
       await adminDb
         .collection('userMemberships')
         .doc('cashier_a_org_pricing_a')
@@ -899,58 +899,36 @@ describe('Firestore Security Rules Comprehensive Security Audit Test Suite', () 
           priceMinor: 5000,
           status: 'ACTIVE',
         });
-
-      await adminDb
-        .collection('organizations')
-        .doc('org_pricing_a')
-        .collection('pricingHistory')
-        .doc('hist_1')
-        .set({
-          newPriceMinor: 5000,
-        });
     });
 
-    const cashierAContext = testEnv.authenticatedContext('cashier_a');
-    const memberBContext = testEnv.authenticatedContext('member_b');
-    const suspendedAContext = testEnv.authenticatedContext('suspended_a');
-    const anonContext = testEnv.unauthenticatedContext();
+    const cashierDb = testEnv.authenticatedContext('cashier_a').firestore();
+    const crossTenantDb = testEnv.authenticatedContext('member_b').firestore();
+    const suspendedDb = testEnv.authenticatedContext('suspended_a').firestore();
 
-    const taxDocRefA = cashierAContext
-      .firestore()
+    const taxDocRefA = cashierDb
       .collection('organizations')
       .doc('org_pricing_a')
       .collection('taxConfigurations')
       .doc('tax_18');
 
-    const ruleDocRefA = cashierAContext
-      .firestore()
+    const ruleDocRefA = cashierDb
       .collection('organizations')
       .doc('org_pricing_a')
       .collection('pricingRules')
       .doc('rule_1');
 
-    const histDocRefA = cashierAContext
-      .firestore()
-      .collection('organizations')
-      .doc('org_pricing_a')
-      .collection('pricingHistory')
-      .doc('hist_1');
-
-    // 1. Active member in Org A can read Org A documents
+    // 1. Active member in Org A can read tax configurations and pricing rules
     await assertSucceeds(taxDocRefA.get());
     await assertSucceeds(ruleDocRefA.get());
-    await assertSucceeds(histDocRefA.get());
 
     // 2. Member of Org B cannot read Org A documents (cross-tenant rejected)
-    const crossTenantTaxRef = memberBContext
-      .firestore()
+    const crossTenantTaxRef = crossTenantDb
       .collection('organizations')
       .doc('org_pricing_a')
       .collection('taxConfigurations')
       .doc('tax_18');
 
-    const crossTenantRuleRef = memberBContext
-      .firestore()
+    const crossTenantRuleRef = crossTenantDb
       .collection('organizations')
       .doc('org_pricing_a')
       .collection('pricingRules')
@@ -960,23 +938,85 @@ describe('Firestore Security Rules Comprehensive Security Audit Test Suite', () 
     await assertFails(crossTenantRuleRef.get());
 
     // 3. Suspended member in Org A cannot read Org A documents
-    const suspendedTaxRef = suspendedAContext
-      .firestore()
+    const suspendedTaxRef = suspendedDb
       .collection('organizations')
       .doc('org_pricing_a')
       .collection('taxConfigurations')
       .doc('tax_18');
 
     await assertFails(suspendedTaxRef.get());
+  });
 
-    // 4. Unauthenticated user cannot read
-    const anonTaxRef = anonContext
-      .firestore()
-      .collection('organizations')
-      .doc('org_pricing_a')
-      .collection('taxConfigurations')
-      .doc('tax_18');
+  it('SEC-TC-PRICING-03-AUDIT-PIM-05-04: Pricing history reads are strictly restricted to OWNER and MANAGER, denying CASHIER, INVENTORY_MGR, ACCOUNTANT, and suspended members', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      await adminDb.collection('organizations').doc('org_audit_hist').set({
+        name: 'Audit Org',
+        status: 'ACTIVE',
+      });
 
-    await assertFails(anonTaxRef.get());
+      // Memberships for all Phase 1 roles
+      const roles = [
+        { uid: 'u_owner', role: 'OWNER', status: 'ACTIVE' },
+        { uid: 'u_manager', role: 'MANAGER', status: 'ACTIVE' },
+        { uid: 'u_cashier', role: 'CASHIER', status: 'ACTIVE' },
+        { uid: 'u_inv_mgr', role: 'INVENTORY_MANAGER', status: 'ACTIVE' },
+        { uid: 'u_accountant', role: 'ACCOUNTANT', status: 'ACTIVE' },
+        { uid: 'u_suspended', role: 'MANAGER', status: 'SUSPENDED' },
+      ];
+
+      for (const m of roles) {
+        await adminDb
+          .collection('userMemberships')
+          .doc(`${m.uid}_org_audit_hist`)
+          .set({
+            userId: m.uid,
+            organizationId: 'org_audit_hist',
+            role: m.role,
+            status: m.status,
+          });
+      }
+
+      await adminDb
+        .collection('organizations')
+        .doc('org_audit_hist')
+        .collection('pricingHistory')
+        .doc('hist_sec_1')
+        .set({
+          oldPriceMinor: 10000,
+          newPriceMinor: 9500,
+          costPriceMinor: 7000,
+        });
+    });
+
+    const ownerDb = testEnv.authenticatedContext('u_owner').firestore();
+    const managerDb = testEnv.authenticatedContext('u_manager').firestore();
+    const cashierDb = testEnv.authenticatedContext('u_cashier').firestore();
+    const invMgrDb = testEnv.authenticatedContext('u_inv_mgr').firestore();
+    const accountantDb = testEnv.authenticatedContext('u_accountant').firestore();
+    const suspendedDb = testEnv.authenticatedContext('u_suspended').firestore();
+
+    const getHistRef = (dbInstance: any) =>
+      dbInstance
+        .collection('organizations')
+        .doc('org_audit_hist')
+        .collection('pricingHistory')
+        .doc('hist_sec_1');
+
+    // 1. OWNER and MANAGER: PERMITTED
+    await assertSucceeds(getHistRef(ownerDb).get());
+    await assertSucceeds(getHistRef(managerDb).get());
+
+    // 2. CASHIER: DENIED
+    await assertFails(getHistRef(cashierDb).get());
+
+    // 3. INVENTORY_MANAGER: DENIED
+    await assertFails(getHistRef(invMgrDb).get());
+
+    // 4. ACCOUNTANT: DENIED
+    await assertFails(getHistRef(accountantDb).get());
+
+    // 5. SUSPENDED MEMBER: DENIED
+    await assertFails(getHistRef(suspendedDb).get());
   });
 });

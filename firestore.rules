@@ -40,6 +40,14 @@ service cloud.firestore {
       return hasActiveMembership(orgId) && getMembershipDoc(orgId).role == 'CASHIER';
     }
 
+    // Only OWNER and MANAGER are permitted to access cost prices and pricing audit history
+    function isPricingAdmin(orgId) {
+      return hasActiveMembership(orgId) && (
+        getMembershipDoc(orgId).role == 'OWNER' ||
+        getMembershipDoc(orgId).role == 'MANAGER'
+      );
+    }
+
     // Enforces store-level authorization against authoritative membership document
     function hasStoreAccess(orgId, storeId) {
       return hasActiveMembership(orgId) && (
@@ -190,7 +198,7 @@ service cloud.firestore {
       }
 
       match /pricingHistory/{id} {
-        allow read: if hasActiveMembership(orgId);
+        allow read: if isPricingAdmin(orgId);
         allow write: if false;
       }
 
